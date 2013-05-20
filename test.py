@@ -1,27 +1,42 @@
-from pyserializable import Serializable, serialize, deserialize
-from pyserializable.field import field
+from pyserializable import serialize, deserialize, autoserialized
 
 
-class Color(Serializable):
-    r = field(format='uint:8', default=0)
-    g = field(format='uint:8', default=0)
-    b = field(format='uint:8', default=0)
-    a = field(format='uint:8', default=0)
+def str_func(*arg_names):
+    def str(self):
+        cls_name = self.__class__.__name__
+
+        def fmt_func(name):
+            value = getattr(self, name)
+            return '{}={}'.format(name, value)
+
+        fmt_str = ', '.join(map(fmt_func, arg_names))
+        return '{}({})'.format(cls_name, fmt_str)
+    return str
 
 
-class Tile(Serializable):
-    enabled = field(format='uint:1', default=False, to_serial=int, from_serial=bool)
-    color = field(Color)
-    elite = field(format='uint:1', default=False, to_serial=int, from_serial=bool)
+@autoserialized
+class Color:
+    serial_format = 'uint:8=r, uint:8=g, uint:8=b, uint:8=a'
+    __str__ = str_func('r', 'g', 'b', 'a')
 
+
+@autoserialized
+class Tile:
+    serial_format = 'uint:1=enabled, Color=color, uint:1=elite'
+    __str__ = str_func('enabled', 'color', 'elite')
 
 t = Tile()
-print(t)
-t.enabled = True
-t.color.g = t.color.a = 100
+t.enabled = False
+t.elite = True
+t.color = Color()
+t.color.r = 201
+t.color.g = 202
+t.color.b = 203
+t.color.a = 204
 
-s = serialize(t)
-t2 = Tile()
-deserialize(t2, s)
+data = serialize(t)
+
+t2 = deserialize(Tile, data)
+
 print(t)
 print(t2)
