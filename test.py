@@ -1,17 +1,5 @@
 from pyserializable import serialize, deserialize, autoserialized, serial_dict
-
-
-def str_func(*arg_names):
-    def str(self):
-        cls_name = self.__class__.__name__
-
-        def fmt_func(name):
-            value = getattr(self, name)
-            return '{}={}'.format(name, value)
-
-        fmt_str = ', '.join(map(fmt_func, arg_names))
-        return '{}({})'.format(cls_name, fmt_str)
-    return str
+from pyserializable.util import str_func
 
 
 @autoserialized
@@ -22,7 +10,6 @@ class Color:
 
 @autoserialized
 class Tile:
-    #serial_format = 'uint:1=enabled, Color=color, uint:1=elite'
     serial_format = 'enabled=uint:1, color=Color, elite=uint:1'
     __str__ = str_func('enabled', 'color', 'elite')
 
@@ -41,3 +28,4 @@ t2 = deserialize(Tile, data)
 
 print(t)
 print(t2)
+print(serial_dict(t))

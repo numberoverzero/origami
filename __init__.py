@@ -1,3 +1,4 @@
+import collections
 import bitstring
 
 
@@ -81,22 +82,22 @@ def autoserialized(cls):
             setattr(obj, attr, kwargs.get(attr, None))
         return obj
     cls.deserialize = deserialize
-
     return cls
 
 
 def serial_dict(obj, prefix='', dict=None):
     if dict is None:
-        dict = {}
+        dict = collections.OrderedDict()
 
-    fmt = get_fmt(obj.__class__)
+    fmt = indexes['cls'][obj.__class__].compact_format
     for argstr in fmt.split(','):
         format, attr_name = argstr.split('=')
         data = getattr(obj, attr_name)
-        if is_registered(format):
+        if format in indexes['normalized_cls_str']:
             # Format is registered as serializable, so data is an object to serialize
             data_prefix = prefix + attr_name + '.'
             serial_dict(data, data_prefix, dict)
         else:
             # Just an attribute
             dict[prefix+attr_name] = data
+    return dict
