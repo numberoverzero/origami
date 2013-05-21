@@ -1,85 +1,102 @@
 import bitstring
 
+
 PREFIX = "Serial_"
-class_formats = {}  # cls_obj => format w/replacement
-format_classes = {}  # str(prefix+name) => cls
+indexes = {}
+attributes = ['cls', 'cls_str', 'normalized_cls_str', 'raw_format', 'compact_format']
+
+#  Build indexes into SerializationMetadata
+for attr in attributes:
+    indexes[attr] = {}
 
 
-def is_registered(clsstr):
-    return (PREFIX + clsstr) in format_classes
+def register(cls, serial_format):
+    metadata = SerializationMetadata(cls, serial_format)
+    for attr, index in indexes.items():
+        index[getattr(metadata, attr)] = metadata
 
 
-def replace_fmt(fmt):
-    pieces = fmt.split(',')
-    new_pieces = []
-    for piece in pieces:
-        #Color=color
-        #uint:8=red
-        pfmt, pname = [p.strip() for p in piece.split('=')]
-        if is_registered(pfmt):
-            new_pieces.append('{}={}'.format(PREFIX+pfmt, pname))
-        else:
-            new_pieces.append('{}={}'.format(pfmt, pname))
-    return ','.join(new_pieces)
+class SerializationMetadata:
+    def __init__(self, cls, raw_format):
+        self.cls = cls
+        self.cls_str = cls.__name__
+        self.normalized_cls_str = PREFIX + self.cls_str
 
+        self.raw_format = raw_format
+        pieces = self.raw_format.split(',')
+        compact_pieces = []
+        for piece in pieces:
+            name, format = [p.strip() for p in piece.split('=')]
+            if format in indexes['cls_str']:
+                compact_pieces.append('{}={}'.format(PREFIX+format, name))
+            else:
+                compact_pieces.append('{}={}'.format(format, name))
+        compact_format = ','.join(compact_pieces)
+        self.compact_format = compact_format
 
-def register(cls):
-    fmt = replace_fmt(cls.serial_format)
-    class_formats[cls] = fmt
-    format_classes[PREFIX + cls.__name__] = cls
-
-
-def get_fmt(cls):
-    return class_formats[cls]
-
-
-def get_cls(arg_str):
-    return format_classes[arg_str]
-
-
-def deserialize(cls, data, seek=True):
-    if seek:
-        data.pos = 0
-    fmt = get_fmt(cls)
-    kwargs = {}
-    for argstr in fmt.split(','):
-        argfmt, argname = argstr.split('=')
-        if PREFIX in argfmt:
-            subcls = get_cls(argfmt)
-            kwargs[argname] = deserialize(subcls, data, seek=False)
-        else:
-            kwargs[argname] = data.read(argfmt)
-    return cls.deserialize(**kwargs)
+        formats = self.raw_format.split(',')
+        attrs = [fmt.split('=')[0].strip() for fmt in formats]
+        self.attrs = attrs
 
 
 def serialize(obj):
     stream = bitstring.BitStream()
-    fmt = get_fmt(obj.__class__)
-    for argstr in fmt.split(','):
-        argfmt, argname = argstr.split('=')
-        data = getattr(obj, argname)
-        if PREFIX in argfmt:
+    cls = obj.__class__
+    cls_format = indexes['cls'][cls].compact_format
+    for argstr in cls_format.split(','):
+        format, name = argstr.split('=')
+        data = getattr(obj, name)
+        if format in indexes['normalized_cls_str']:
             substream = serialize(data)
         else:
-            substream = bitstring.pack(argfmt, data)
+            substream = bitstring.pack(format, data)
         stream.append(substream)
     return stream
 
 
-def get_attrs(cls):
-    attr_fmts = cls.serial_format.split(',')
-    attr_names = [fmt.split('=')[1].strip() for fmt in attr_fmts]
-    return attr_names
+def deserialize(cls, data, seek=True):
+    kwargs = {}
+    if seek:
+        data.pos = 0
+
+    cls_format = indexes['cls'][cls].compact_format
+    for argstr in cls_format.split(','):
+        format, name = argstr.split('=')
+        if PREFIX in format:
+            subcls = indexes['normalized_cls_str'][format].cls
+            kwargs[name] = deserialize(subcls, data, seek=False)
+        else:
+            kwargs[name] = data.read(format)
+    return cls.deserialize(**kwargs)
 
 
 def autoserialized(cls):
+    '''The class must support an empty init function.'''
+    register(cls, cls.serial_format)
+
     @classmethod
     def deserialize(cls, **kwargs):
         obj = cls()
-        for attr in get_attrs(cls):
+        for attr in indexes['cls'][cls].attrs:
             setattr(obj, attr, kwargs.get(attr, None))
         return obj
-
     cls.deserialize = deserialize
-    register(cls)
+
     return cls
+
+
+def serial_dict(obj, prefix='', dict=None):
+    if dict is None:
+        dict = {}
+
+    fmt = get_fmt(obj.__class__)
+    for argstr in fmt.split(','):
+        format, attr_name = argstr.split('=')
+        data = getattr(obj, attr_name)
+        if is_registered(format):
+            # Format is registered as serializable, so data is an object to serialize
+            data_prefix = prefix + attr_name + '.'
+            serial_dict(data, data_prefix, dict)
+        else:
+            # Just an attribute
+            dict[prefix+attr_name] = data

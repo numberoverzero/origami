@@ -1,4 +1,4 @@
-from pyserializable import serialize, deserialize, autoserialized
+from pyserializable import serialize, deserialize, autoserialized, serial_dict
 
 
 def str_func(*arg_names):
@@ -16,13 +16,14 @@ def str_func(*arg_names):
 
 @autoserialized
 class Color:
-    serial_format = 'uint:8=r, uint:8=g, uint:8=b, uint:8=a'
+    serial_format = 'r=uint:8, g=uint:8, b=uint:8, a=uint:8'
     __str__ = str_func('r', 'g', 'b', 'a')
 
 
 @autoserialized
 class Tile:
-    serial_format = 'uint:1=enabled, Color=color, uint:1=elite'
+    #serial_format = 'uint:1=enabled, Color=color, uint:1=elite'
+    serial_format = 'enabled=uint:1, color=Color, elite=uint:1'
     __str__ = str_func('enabled', 'color', 'elite')
 
 t = Tile()
