@@ -1,4 +1,4 @@
-from pyserializable import serialize, deserialize, autoserialized, serial_dict
+from pyserializable import serialize, deserialize, autoserialized
 from pyserializable.util import repr_func
 
 
@@ -30,4 +30,3 @@ t2 = deserialize(Tile, data)
 
 print(t)
 print(t2)
-print(serial_dict(t))
