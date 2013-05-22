@@ -30,16 +30,30 @@ def prefix_keys(prefix, dict):
 
 def str_func(*arg_names):
     '''For the given arg names, returns a function that prints the values of those attributes on the object.'''
-    def str(self):
+    def str_(self):
         cls_name = self.__class__.__name__
 
         def fmt_func(name):
             value = getattr(self, name)
-            return '{}={}'.format(name, value)
+            return '{}={}'.format(name, str(value))
 
         fmt_str = ', '.join(map(fmt_func, arg_names))
         return '{}({})'.format(cls_name, fmt_str)
-    return str
+    return str_
+
+
+def repr_func(*arg_names):
+    '''For the given arg names, returns a function that prints the values of those attributes on the object.'''
+    def repr_(self):
+        cls_name = self.__class__.__name__
+
+        def fmt_func(name):
+            value = getattr(self, name)
+            return '{}={}'.format(name, repr(value))
+
+        fmt_str = ', '.join(map(fmt_func, arg_names))
+        return '{}({})'.format(cls_name, fmt_str)
+    return repr_
 
 
 noop = lambda self, *a, **kw: None
