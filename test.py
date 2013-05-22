@@ -1,23 +1,25 @@
 from pyserializable import serialize, deserialize, autoserialized, serial_dict
-from pyserializable.util import str_func
+from pyserializable.util import repr_func
 
 
 @autoserialized
 class Color:
     serial_format = 'r=uint:8, g=uint:8, b=uint:8, a=uint:8'
-    __str__ = str_func('r', 'g', 'b', 'a')
+    serial_attr_converters = {'r': [int, str]}
+    __repr__ = repr_func('r', 'g', 'b', 'a')
 
 
 @autoserialized
 class Tile:
     serial_format = 'enabled=uint:1, color=Color, elite=uint:1'
-    __str__ = str_func('enabled', 'color', 'elite')
+    serial_fmt_converters = {'uint:1': [int, bool]}
+    __repr__ = repr_func('enabled', 'color', 'elite')
 
 t = Tile()
 t.enabled = False
 t.elite = True
 t.color = Color()
-t.color.r = 201
+t.color.r = '201'
 t.color.g = 202
 t.color.b = 203
 t.color.a = 204
