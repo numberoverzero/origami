@@ -26,7 +26,13 @@ t.color.a = 204
 
 data = serialize(t)
 
+# Deserialize based on class
 t2 = deserialize(Tile, data)
+
+#Deserialize into existing instance
+t3 = Tile()
+deserialize(t3, data)
 
 print(t)
 print(t2)
+print(t3)

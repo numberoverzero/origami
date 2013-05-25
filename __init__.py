@@ -14,7 +14,10 @@ for attr in _attributes:
 def register(cls, format, attr_converters=None, fmt_converters=None):
     '''
     cls: The class to register.  This should have a classmethod called
-        'deserialize' which takes **kwargs.  For each key => value pair,
+        'deserialize' which has the signature:
+            deserialize(cls, instance, **kwargs).
+        instance may be an instance of the class, or None if
+        only the class was provided.  For each key => value pair,
         the key is an attribute of the instance whose deserialized value
         is value.  In other words, <inst of cls>.key = value
     format: Format string of comma-separated name=format pairs,
@@ -80,13 +83,24 @@ def serialize(obj):
     return stream
 
 
-def deserialize(cls, data, seek=True):
+def deserialize(cls_or_obj, data, seek=True):
     '''
-    Takes a class object and a bitstring.BitStream object
-    and returns an instance of the class with the data in the
-    BitStream deserialized into the new instance according to
-    the format registered for the class.
+    Takes a registered class or an instance of a registered class
+    and a bitstring.BitStream object and returns an instance of
+    the class with the data in the BitStream deserialized into
+    the new instance according to the format registered for the class.
     '''
+    # An instance of a registered class
+    if _has_registered_class(cls_or_obj.__class__):
+        cls = cls_or_obj.__class__
+        instance = cls_or_obj
+    # If it's registered, it's a class
+    elif _has_registered_class(cls_or_obj):
+        cls = cls_or_obj
+        instance = None
+    else:
+        raise ValueError("Don't know how to deserialize {}".format(cls_or_obj))
+
     kwargs = {}
     if seek:
         data.pos = 0
@@ -109,7 +123,7 @@ def deserialize(cls, data, seek=True):
             elif format in fmt_converters:
                 value = fmt_converters[format][1](value)
             kwargs[name] = value
-    return cls.deserialize(**kwargs)
+    return cls.deserialize(instance, **kwargs)
 
 
 def autoserialized(cls):
@@ -139,11 +153,12 @@ def autoserialized(cls):
     )
 
     @classmethod
-    def deserialize(cls, **kwargs):
-        obj = cls()
+    def deserialize(cls, instance, **kwargs):
+        if instance is None:
+            instance = cls()
         for attr in _metadata_field('cls', cls, 'attrs'):
-            setattr(obj, attr, kwargs.get(attr, None))
-        return obj
+            setattr(instance, attr, kwargs.get(attr, None))
+        return instance
     cls.deserialize = deserialize
     return cls
 
