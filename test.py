@@ -3,14 +3,14 @@ from pyserializable.util import repr_func
 
 
 @autoserialized
-class Color:
+class Color(object):
     serial_format = 'r=uint:8, g=uint:8, b=uint:8, a=uint:8'
     serial_attr_converters = {'r': [int, str]}
     __repr__ = repr_func('r', 'g', 'b', 'a')
 
 
 @autoserialized
-class Tile:
+class Tile(object):
     serial_format = 'enabled=uint:1, color=Color, elite=uint:1'
     serial_fmt_converters = {'uint:1': [int, bool]}
     __repr__ = repr_func('enabled', 'color', 'elite')
