@@ -1,6 +1,8 @@
 import bitstring
 
 __all__ = ['Serializer', 'autoserializer']
+_MISSING_ATTR = "'{}' object was missing expected attribute '{}'"
+_AUTO_MISSING_ATTR = "Built-in deserialization method expected value for attribute '{}' but found none."
 
 
 class Serializer(object):
@@ -69,7 +71,10 @@ class Serializer(object):
 
         for argstr in cls_format.split(','):
             format, name = argstr.split('=')
-            data = getattr(obj, name)
+            try:
+                data = getattr(obj, name)
+            except AttributeError:
+                raise AttributeError(_MISSING_ATTR.format(cls.__name__, name))
             if self._has_registered_class(format, normalized=True):
                 substream = self.serialize(data)
             else:
@@ -217,7 +222,7 @@ def _autoserialized(serializer, cls):
             try:
                 setattr(instance, attr, kwargs[attr])
             except KeyError:
-                continue
+                raise AttributeError(_AUTO_MISSING_ATTR.format(attr))
         return instance
     cls.deserialize = deserialize
     return cls
