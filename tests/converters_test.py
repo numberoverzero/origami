@@ -29,6 +29,27 @@ class ConverterTests(unittest.TestCase):
         assert blob == other_blob
 
     def testSingleAttrConverter(self):
+        '''Attribute converters should work on specified fields'''
+
+        @autoserializer(self.s)
+        class Blob(object):
+            serial_format = 'enabled=uint:1, r=uint:8, g=uint:8, b=uint:8'
+            serial_attr_converters = {'enabled': [int, bool]}
+
+            __eq__ = equals('enabled', 'r', 'g', 'b')
+
+        blob = Blob()
+        blob.enabled = True
+        blob.r = 127
+        blob.g = 128
+        blob.b = 129
+
+        data = self.s.serialize(blob)
+        other_blob = self.s.deserialize(Blob, data)
+
+        assert blob == other_blob
+
+    def testSingleFmtConverter(self):
         '''Format converters should work on all fields with matching formats'''
 
         @autoserializer(self.s)
@@ -39,7 +60,7 @@ class ConverterTests(unittest.TestCase):
             __eq__ = equals('enabled', 'r', 'g', 'b')
 
         blob = Blob()
-        blob.enabled = True
+        blob.enabled = 1
         blob.r = '127'
         blob.g = '128'
         blob.b = '129'
