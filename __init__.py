@@ -1,171 +1,232 @@
-from functools import wraps
-import collections
 import bitstring
 
-
-noop_init = lambda *a, **kw: None
-passthrough = lambda v: v
-
-
-def flatten(l, ltypes=collections.Sequence):
-    l = list(l)
-    while l:
-        if isinstance(l[0], str):
-            yield l.pop(0)
-            continue
-        while l and isinstance(l[0], ltypes):
-            l[0:1] = l[0]
-        if l:
-            yield l.pop(0)
+__all__ = ['Serializer', 'autoserializer']
+_MISSING_ATTR = "'{}' object was missing expected attribute '{}'"
+_AUTO_MISSING_ATTR = "Built-in deserialization method expected value for attribute '{}' but found none."
 
 
-def serialize(obj):
-    values = list(obj.serial_values)
-    return bitstring.pack(obj.serial_format, *values)
+class Serializer(object):
+    def __init__(self):
+        self._PREFIX = "Serial_"
+        self._indexes = {}
+        self._attributes = ['cls', 'cls_str', 'normalized_cls_str', 'raw_format', 'compact_format']
 
+        #  Build indexes into metadata so we can get at it by most properties
+        for attr in self._attributes:
+            self._indexes[attr] = {}
 
-def deserialize(obj, bitstream):
-    object_array = bitstream.unpack(obj.serial_format)
-    obj.deserialize(object_array)
-
-
-class SerializableMixin(object):
-    serializable_format = ''
-    serializable_values = []
-
-    def deserialize(self, values, offset=0):
-        return offset
-
-
-class Field(object):
-    def __init__(self, cls, *args, **kwargs):
+    def register(self, cls, format, attr_converters=None, fmt_converters=None):
         '''
-        Allows us to defer instantation of an attribute
-        of a class from class creation
+        cls: The class to register.  This should have a classmethod called
+            'deserialize' which has the signature:
+                deserialize(cls, instance, **kwargs).
+            instance may be an instance of the class, or None if
+            only the class was provided.  For each key => value pair,
+            the key is an attribute of the instance whose deserialized value
+            is value.  In other words, <inst of cls>.key = value
+        format: Format string of comma-separated name=format pairs,
+            where each name is a string of an attribute on instances
+            of cls that can be serialized and deserialized.
+            Example: 'r=uint:8, g=uint:8, b=uint:8' would serialize
+            the r, g, b attributes on an instance of cls.
+        attr_converters: dictionary of name => [func, func] where name
+            is a string of an attribute on instances of cls.
+            Each function should take one value and return one value.
+            The first function should return a value which can be serialized
+            according to the format specified in the format string above.
+            The second function takes a value which is returned from unpacking
+            a bitstring.  The value returned by this function will be inserted
+            for the attribute named into an instance of the cls.
+        fmt_converters: dictionary of format => func, func much like
+            attr_converters, except each key is a string representing a format
+            field that may be in the format string above.  The functions are
+            identical to those in attr_converters.  For each format key in this
+            dictionary, any attribute with the same format string will use these
+            converters when serializing/deserializing.
+
+        If an attribute is mapped in attr_converters and its format is
+            mapped in fmt_converters, then its attribute converter
+            will be used instead of its format converter.
         '''
-        self.cls = cls
-        self.args = args
-        self.kwargs = kwargs
+        metadata = self._generate_metadata(
+            cls, format,
+            attr_converters=attr_converters,
+            fmt_converters=fmt_converters
+        )
+        for attr, index in self._indexes.items():
+            index[metadata[attr]] = metadata
 
-    def __get__(self, obj, *args):
-        return obj.__dict__[self.name]
+    def serialize(self, obj):
+        '''
+        If obj is an instance of a class that has been registered,
+        returns a bitstring.BitStream object with the serialized
+        representation of the object according to its format.
+        '''
+        stream = bitstring.BitStream()
+        cls = obj.__class__
 
-    def __set__(self, obj, value):
-        obj.__dict__[self.name] = value
+        cls_format = self._metadata_field('cls', cls, 'compact_format')
+        attr_converters = self._metadata_field('cls', cls, 'attr_converters')
+        fmt_converters = self._metadata_field('cls', cls, 'fmt_converters')
 
-    @property
-    def instance(self):
-        return self.cls(*(self.args), **(self.kwargs))
+        for argstr in cls_format.split(','):
+            format, name = argstr.split('=')
+            try:
+                data = getattr(obj, name)
+            except AttributeError:
+                raise AttributeError(_MISSING_ATTR.format(cls.__name__, name))
+            if self._has_registered_class(format, normalized=True):
+                substream = self.serialize(data)
+            else:
+                # Check for converters for this object.
+                # Attribute converters take precedence.
+                if name in attr_converters:
+                    data = attr_converters[name][0](data)
+                elif format in fmt_converters:
+                    data = fmt_converters[format][0](data)
+                substream = bitstring.pack(format, data)
+            stream.append(substream)
+        return stream
+
+    def deserialize(self, cls_or_obj, data, seek=True):
+        '''
+        Takes a registered class or an instance of a registered class
+        and a bitstring.BitStream object and returns an instance of
+        the class with the data in the BitStream deserialized into
+        the new instance according to the format registered for the class.
+        '''
+        # An instance of a registered class
+        if self._has_registered_class(cls_or_obj.__class__):
+            cls = cls_or_obj.__class__
+            instance = cls_or_obj
+        # If it's registered, it's a class
+        elif self._has_registered_class(cls_or_obj):
+            cls = cls_or_obj
+            instance = None
+        else:
+            raise ValueError("Don't know how to deserialize {}".format(cls_or_obj))
+
+        kwargs = {}
+        if seek:
+            data.pos = 0
+
+        cls_format = self._metadata_field('cls', cls, 'compact_format')
+        attr_converters = self._metadata_field('cls', cls, 'attr_converters')
+        fmt_converters = self._metadata_field('cls', cls, 'fmt_converters')
+
+        for argstr in cls_format.split(','):
+            format, name = argstr.split('=')
+            if self._has_registered_class(format, normalized=True):
+                subcls = self._metadata_field('normalized_cls_str', format, 'cls')
+                kwargs[name] = self.deserialize(subcls, data, seek=False)
+            else:
+                value = data.read(format)
+                # Check for converters for this object.
+                # Attribute converters take precedence.
+                if name in attr_converters:
+                    value = attr_converters[name][1](value)
+                elif format in fmt_converters:
+                    value = fmt_converters[format][1](value)
+                kwargs[name] = value
+        return cls.deserialize(instance, **kwargs)
+
+    def _normalized_class_str(self, cls_or_str):
+        '''Centralized normalizing logic so we don't have PREFIX sprinkled throughout our functions'''
+        if not isinstance(cls_or_str, str):
+            cls_or_str = cls_or_str.__name__
+        return self._PREFIX + cls_or_str
+
+    def _generate_metadata(self, cls, raw_format, attr_converters=None, fmt_converters=None):
+            metadata = {}
+            metadata['cls'] = cls
+            metadata['cls_str'] = cls.__name__
+            metadata['normalized_cls_str'] = self._normalized_class_str(cls)
+            metadata['raw_format'] = raw_format
+
+            pieces = raw_format.split(',')
+            compact_pieces = []
+            for piece in pieces:
+                name, format = [p.strip() for p in piece.split('=')]
+                if self._has_registered_class(format, normalized=False):
+                    compact_pieces.append('{}={}'.format(self._normalized_class_str(format), name))
+                else:
+                    compact_pieces.append('{}={}'.format(format, name))
+            compact_format = ','.join(compact_pieces)
+            metadata['compact_format'] = compact_format
+
+            formats = raw_format.split(',')
+            attrs = [fmt.split('=')[0].strip() for fmt in formats]
+            metadata['attrs'] = attrs
+
+            metadata['attr_converters'] = attr_converters or {}
+            metadata['fmt_converters'] = fmt_converters or {}
+
+            return metadata
+
+    def _metadata_field(self, index_type, index_value, metadata_field):
+        '''
+        index_type: string of the type of value you're finding metadata by.  Examples include 'cls' or 'raw_format'.
+        index_value: value of the previous type.  For 'cls' a class object, for 'raw_format' a format string.
+        metadata_field: string of the field type to retrieve.  This can be any of the values for index_type.
+        '''
+        return self._indexes[index_type][index_value][metadata_field]
+
+    def _has_registered_class(self, cls_or_str, normalized=False):
+        '''
+        Takes either a class object or the string of a class name.
+        normalized: True if the cls string is normalized.
+            class: <class 'MySerializableClass'>
+            class string: 'MySerializableClass'
+            normalized class string: 'Serial_MySerializableClass' (or whatever PREFIX is)
+        '''
+
+        if not normalized:
+            normalized_name = self._normalized_class_str(cls_or_str)
+        else:
+            normalized_name = cls_or_str
+        normalized_cls_dicts = self._indexes['normalized_cls_str']
+        return normalized_name in normalized_cls_dicts
 
 
-class ClassWrapperField(Field, SerializableMixin):
-    def __init__(self, cls, *args, **kwargs):
-        assert issubclass(cls, SerializableMixin)
-        super().__init__(cls, *args, **kwargs)
-        self.serial_format = self.cls.serial_format
-
-    def serial_values(self, obj):
-        return self.__get__(obj).serial_values
-
-    def deserialize(self, obj, values, offset=0):
-        return self.__get__(obj).deserialize(values, offset)
-
-
-class RawSerialField(Field, SerializableMixin):
-    def __init__(self, format='', default=None,
-                 to_serial=passthrough, from_serial=passthrough):
-        self.serial_format = format
-        self.default = default
-        self.to_serial = to_serial
-        self.from_serial = from_serial
-
-    def serial_values(self, obj):
-        raw_object = self.__get__(obj)
-        serial_object = self.to_serial(raw_object)
-        return serial_object
-
-    def deserialize(self, obj, values, offset=0):
-        serial_object = values[offset]
-        raw_object = self.from_serial(serial_object)
-        self.__set__(obj, raw_object)
-        return offset + 1
-
-    @property
-    def instance(self):
-        return self.default
-
-
-def f(*args, **kwargs):
+def _autoserialized(serializer, cls):
     '''
-    Wraps a SerializableMixin class so it can Fieldatized,
-    or constructs a RawSerialField if kwargs are passed
+    Decorator that automatically registers a class as serializable
+        and generates a deserialize method for a class.
+    The class must have a 'serial_format' attribute which is
+        a format string used to serialize/deserialize attributes
+        on an instance of itself.
+    The class must also allow an empty constructor.  If the init
+        function requires arguments, it cannot be autoserialized.
+    If the attribute 'serial_attr_converters' is found, it will
+        be passed to the register function as the attr_converters
+        dictionary.
+    If the attribute 'serial_fmt_converters' is found, it will
+        be passed to the register function as the fmt_converters
+        dictionary.
+
+    See the register method for more details on how converters are used.
     '''
-    assert len(args) < 2  # If it's a SerializableMixin class,
-                          # it should be exactly one arg
-                          # and no kwargs.  If it's a RawSerialField,
-                          # everything should be kwargs.
+    attr_converters = getattr(cls, 'serial_attr_converters', None)
+    fmt_converters = getattr(cls, 'serial_fmt_converters', None)
+    serializer.register(
+        cls, cls.serial_format,
+        attr_converters=attr_converters,
+        fmt_converters=fmt_converters
+    )
 
-    if len(args) == 1 and not kwargs:
-        cls = args[0]
-
-        @wraps(cls)
-        def init(*args, **kwargs):
-            return ClassWrapperField(cls, *args, **kwargs)
-        return init
-    return RawSerialField(**kwargs)
-
-
-class DeclarativeMetaclass(type):
     @classmethod
-    def __prepare__(cls, name, bases):
-        return collections.OrderedDict()
-
-    def __new__(cls, name, bases, attrs):
-        declared_fields = collections.OrderedDict()
-        for attr_name, attr_val in attrs.items():
-            if isinstance(attr_val, Field):
-                declared_fields[attr_name] = attr_val
-                attr_val.name = attr_name
-        attrs['_declared_fields'] = declared_fields
-
-        serial_fields = collections.OrderedDict()
-        for attr_name, attr_val in declared_fields.items():
-            if isinstance(attr_val, SerializableMixin):
-                serial_fields[attr_name] = attr_val
-        attrs['_serial_fields'] = serial_fields
-
-        fmt_gen = (f.serial_format for f in serial_fields.values())
-        serial_format = ', '.join(fmt_gen)
-        attrs['serial_format'] = serial_format
-
-        real_init = attrs.get('__init__', noop_init)
-
-        def fake_init(self, *args, **kwargs):
-            for field_name, field in self._declared_fields.items():
-                setattr(self, field_name, field.instance)
-            real_init(self, *args, **kwargs)
-        attrs['__init__'] = fake_init
-
-        if '__str__' not in attrs:
-            def str_(self):
-                cls_name = self.__class__.__name__
-                fmt = lambda item: '{}={}'.format(
-                    item[0], str(item[1].__get__(self)))
-                decl_iter = ', '.join(map(fmt, self._declared_fields.items()))
-                return '{}({})'.format(cls_name, decl_iter)
-            attrs['__str__'] = str_
-
-        return super().__new__(cls, name, bases, attrs)
+    def deserialize(cls, instance, **kwargs):
+        if instance is None:
+            instance = cls()
+        for attr in serializer._metadata_field('cls', cls, 'attrs'):
+            try:
+                setattr(instance, attr, kwargs[attr])
+            except KeyError:
+                raise AttributeError(_AUTO_MISSING_ATTR.format(attr))
+        return instance
+    cls.deserialize = deserialize
+    return cls
 
 
-class Serializable(SerializableMixin, metaclass=DeclarativeMetaclass):
-    @property
-    def serial_values(self):
-        values = lambda field: field.serial_values(self)
-        values_gen = map(values, self._serial_fields.values())
-        return list(flatten(values_gen))
-
-    def deserialize(self, values, offset=0):
-        for field in self._serial_fields.values():
-            offset = field.deserialize(self, values, offset)
-        return offset
+def autoserializer(serializer):
+    return lambda cls: _autoserialized(serializer, cls)
