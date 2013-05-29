@@ -1,5 +1,6 @@
 import unittest
-from pyserializable import autoserializer, Serializer
+from pyserializable import autoserializer, Serializer, serialize, deserialize
+from pyserializable.tests import equals
 
 
 class AutoserializedTests(unittest.TestCase):
@@ -16,6 +17,8 @@ class AutoserializedTests(unittest.TestCase):
             def __init__(self, n='empty'):
                 self.n = n
                 Blob.init_calls += 1
+
+            __eq__ = equals('n')
 
         self.Blob = Blob
 
@@ -70,3 +73,20 @@ class AutoserializedTests(unittest.TestCase):
         deserialize = lambda: self.Blob.deserialize(None, **data)
 
         self.assertRaises(AttributeError, deserialize)
+
+    def testUnknownSerializerMethods(self):
+        '''
+        If the class is autoserialized, we shouldn't need to know the serializer to use it
+        (using its _serializable attribute)
+        '''
+
+        blob = self.Blob(127)
+
+        s = serialize(blob)
+        other_blob = deserialize(self.Blob, s)
+
+        some_other_blob = self.Blob('wrong value')
+        deserialize(some_other_blob, s)
+
+        assert blob == other_blob
+        assert blob == some_other_blob

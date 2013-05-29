@@ -1,6 +1,6 @@
 import unittest
-from pyserializable import Serializer
-from pyserializable.tests import equals
+from pyserializable import Serializer, serialize, deserialize
+from pyserializable.tests import equals, init
 
 
 class DeserializationTests(unittest.TestCase):
@@ -10,15 +10,7 @@ class DeserializationTests(unittest.TestCase):
 
         class Blob(object):
             serial_format = 'a=uint:1, b=uint:2, c=uint:3, d=uint:4'
-            init_calls = 0
-
-            def __init__(self):
-                Blob.init_calls += 1
-
-            def set_attrs(self, *values):
-                for attr, value in zip('abcd', values):
-                    setattr(self, attr, value)
-
+            __init__ = init(*list('abcd'))
             __eq__ = equals(*list('abcd'))
 
             @classmethod
@@ -33,13 +25,12 @@ class DeserializationTests(unittest.TestCase):
         serializer = Serializer()
         serializer.register(Blob, Blob.serial_format)
 
-        self.s = serializer
+        self.s = Blob._serializer = serializer
 
     def testOjbectDeserialization(self):
         '''Deserialize into an object that already exists, not using the class's __init__ function'''
 
-        blob = self.Blob()
-        blob.set_attrs(1, 3, 7, 15)
+        blob = self.Blob(1, 3, 7, 15)
         other_blob = self.Blob()
         serialized_blob = self.s.serialize(blob)
 
@@ -49,9 +40,22 @@ class DeserializationTests(unittest.TestCase):
     def testClassDeserialization(self):
         '''Deserialize against a class, using the class's __init__ function'''
 
-        blob = self.Blob()
-        blob.set_attrs(1, 3, 7, 15)
+        blob = self.Blob(1, 3, 7, 15)
         serialized_blob = self.s.serialize(blob)
 
         other_blob = self.s.deserialize(self.Blob, serialized_blob)
         assert blob == other_blob
+
+    def testClassSerializerAttribute(self):
+        '''serialize and deserialize should work with the class's _serializer attribute'''
+
+        blob = self.Blob(1, 3, 7, 15)
+        s = serialize(blob)
+
+        other_blob = deserialize(self.Blob, s)
+
+        some_other_blob = self.Blob('wat', 'oh', 'god', 'no')
+        deserialize(some_other_blob, s)
+
+        assert blob == other_blob
+        assert blob == some_other_blob

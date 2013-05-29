@@ -1,6 +1,6 @@
 import bitstring
 
-__all__ = ['Serializer', 'autoserializer']
+__all__ = ['Serializer', 'autoserializer', 'serialize', 'deserialize']
 _MISSING_ATTR = "'{}' object was missing expected attribute '{}'"
 _AUTO_MISSING_ATTR = "Built-in deserialization method expected value for attribute '{}' but found none."
 
@@ -9,7 +9,7 @@ class Serializer(object):
     def __init__(self):
         self._PREFIX = "Serial_"
         self._indexes = {}
-        self._attributes = ['cls', 'cls_str', 'normalized_cls_str', 'raw_format', 'compact_format']
+        self._attributes = ['cls', 'cls_str', 'normalized_cls_str']
 
         #  Build indexes into metadata so we can get at it by most properties
         for attr in self._attributes:
@@ -224,9 +224,41 @@ def _autoserialized(serializer, cls):
             except KeyError:
                 raise AttributeError(_AUTO_MISSING_ATTR.format(attr))
         return instance
+
     cls.deserialize = deserialize
+
+    # Hook up the serializer so that we don't need to know it to serialize/deserialize objects of this type
+    cls._serializer = serializer
+
     return cls
 
 
 def autoserializer(serializer):
     return lambda cls: _autoserialized(serializer, cls)
+
+
+def serialize(obj):
+    '''
+    If the object's class has a _serializer field, uses that serializer.
+    Otherwise, raises an AttributeError.
+    '''
+    cls = obj.__class__
+    if hasattr(cls, '_serializer'):
+        return cls._serializer.serialize(obj)
+    else:
+        raise AttributeError("Couldn't find a serializer for object of type '{}'".format(cls.__name__))
+
+
+def deserialize(cls_or_obj, data, seek=True):
+    '''
+    If the class (or object's class) has a _serializer field, uses that serializer.
+    Otherwise, raises an AttributeError.
+    '''
+    try:
+        serializer = cls_or_obj._serializer
+    except:
+        try:
+            serializer = cls_or_obj.__class__._serializer
+        except:
+            raise AttributeError("Couldn't find a serializer to deserialize with.")
+    return serializer.deserialize(cls_or_obj, data, seek=seek)
