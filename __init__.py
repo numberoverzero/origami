@@ -57,14 +57,14 @@ class Serializer(object):
             index[metadata[attr]] = metadata
 
     def serialize(self, obj):
-        '''
-        If obj is an instance of a class that has been registered,
-        returns a bitstring.BitStream object with the serialized
-        representation of the object according to its format.
-        '''
-        stream = bitstring.BitStream()
-        cls = obj.__class__
+        values = self._get_flat_values(obj)
+        fmt = self._metadata_field('cls', obj.__class__, 'flat_format')
+        return bitstring.pack(fmt, *values)
 
+    def _get_flat_values(self, obj):
+        values = []
+
+        cls = obj.__class__
         cls_format = self._metadata_field('cls', cls, 'compact_format')
         attr_converters = self._metadata_field('cls', cls, 'attr_converters')
         fmt_converters = self._metadata_field('cls', cls, 'fmt_converters')
@@ -75,18 +75,20 @@ class Serializer(object):
                 data = getattr(obj, name)
             except AttributeError:
                 raise AttributeError(_MISSING_ATTR.format(cls.__name__, name))
+
             if self._has_registered_class(format, normalized=True):
-                substream = self.serialize(data)
+                # Serializable object, get its attributes
+                sub_values = self._get_flat_values(data)
+                values.extend(sub_values)
             else:
-                # Check for converters for this object.
                 # Attribute converters take precedence.
                 if name in attr_converters:
                     data = attr_converters[name][0](data)
                 elif format in fmt_converters:
                     data = fmt_converters[format][0](data)
-                substream = bitstring.pack(format, data)
-            stream.append(substream)
-        return stream
+                values.append(data)
+
+        return values
 
     def deserialize(self, cls_or_obj, data, seek=True):
         '''
@@ -145,14 +147,19 @@ class Serializer(object):
 
             pieces = raw_format.split(',')
             compact_pieces = []
+            flat_pieces = []
             for piece in pieces:
                 name, format = [p.strip() for p in piece.split('=')]
                 if self._has_registered_class(format, normalized=False):
                     compact_pieces.append('{}={}'.format(self._normalized_class_str(format), name))
+                    flat_pieces.append(self._metadata_field('cls_str', format, 'flat_format'))
                 else:
                     compact_pieces.append('{}={}'.format(format, name))
+                    flat_pieces.append(format)
             compact_format = ','.join(compact_pieces)
+            flat_format = ','.join(flat_pieces)
             metadata['compact_format'] = compact_format
+            metadata['flat_format'] = flat_format
 
             formats = raw_format.split(',')
             attrs = [fmt.split('=')[0].strip() for fmt in formats]
