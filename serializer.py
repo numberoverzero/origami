@@ -6,13 +6,8 @@ _MISSING_ATTR = "'{}' object was missing expected attribute '{}'"
 
 class Serializer(object):
     def __init__(self):
-        self._PREFIX = "Serial_"
-        self._indexes = {}
-        self._attributes = ['cls', 'cls_str', 'normalized_cls_str']
-
-        #  Build indexes into metadata so we can get at it by most properties
-        for attr in self._attributes:
-            self._indexes[attr] = {}
+        self._cls = {}
+        self._cls_metadata = {}
 
     def register(self, cls, format, attr_converters=None, fmt_converters=None):
         '''
@@ -52,12 +47,12 @@ class Serializer(object):
             attr_converters=attr_converters,
             fmt_converters=fmt_converters
         )
-        for attr, index in self._indexes.items():
-            index[metadata[attr]] = metadata
+        self._cls[cls.__name__] = cls
+        self._cls_metadata[cls] = metadata
 
     def serialize(self, obj):
         values = self._get_flat_values(obj)
-        fmt = self._metadata_field('cls', obj.__class__, 'flat_format')
+        fmt = self._cls_metadata[obj.__class__]['flat_format']
         return bitstring.pack(fmt, *values)
 
     def deserialize(self, cls_or_obj, data, seek=True):
@@ -67,14 +62,18 @@ class Serializer(object):
         the class with the data in the BitStream deserialized into
         the new instance according to the format registered for the class.
         '''
-        # An instance of a registered class
-        if self._has_registered_class(cls_or_obj.__class__):
+        instance = None
+
+        #Class object
+        if cls_or_obj in self._cls_metadata:
+            cls = cls_or_obj
+        #Class string
+        elif cls_or_obj in self._cls:
+            cls = cls_from_str(cls_or_obj)
+        #Instance
+        elif cls_or_obj.__class__ in self._cls_metadata:
             cls = cls_or_obj.__class__
             instance = cls_or_obj
-        # If it's registered, it's a class
-        elif self._has_registered_class(cls_or_obj):
-            cls = cls_or_obj
-            instance = None
         else:
             raise ValueError("Don't know how to deserialize {}".format(cls_or_obj))
 
@@ -82,13 +81,13 @@ class Serializer(object):
         if seek:
             data.pos = 0
 
-        cls_format = self._metadata_field('cls', cls, 'compact_format')
-        attr_converters = self._metadata_field('cls', cls, 'attr_converters')
-        fmt_converters = self._metadata_field('cls', cls, 'fmt_converters')
+        cls_format = self._cls_metadata[cls]['compact_format']
+        attr_converters = self._cls_metadata[cls]['attr_converters']
+        fmt_converters = self._cls_metadata[cls]['fmt_converters']
 
         for format, name in multidelim_generator(cls_format, ',', '='):
-            if self._has_registered_class(format, normalized=True):
-                subcls = self._metadata_field('normalized_cls_str', format, 'cls')
+            if format in self._cls:
+                subcls = self._cls[format]
                 kwargs[name] = self.deserialize(subcls, data, seek=False)
             else:
                 value = data.read(format)
@@ -105,9 +104,9 @@ class Serializer(object):
         values = []
 
         cls = obj.__class__
-        cls_format = self._metadata_field('cls', cls, 'compact_format')
-        attr_converters = self._metadata_field('cls', cls, 'attr_converters')
-        fmt_converters = self._metadata_field('cls', cls, 'fmt_converters')
+        cls_format = self._cls_metadata[cls]['compact_format']
+        attr_converters = self._cls_metadata[cls]['attr_converters']
+        fmt_converters = self._cls_metadata[cls]['fmt_converters']
 
         for format, name in multidelim_generator(cls_format, ',', '='):
             try:
@@ -115,7 +114,7 @@ class Serializer(object):
             except AttributeError:
                 raise AttributeError(_MISSING_ATTR.format(cls.__name__, name))
 
-            if self._has_registered_class(format, normalized=True):
+            if format in self._cls:
                 # Serializable object, get its attributes
                 sub_values = self._get_flat_values(data)
                 values.extend(sub_values)
@@ -129,28 +128,21 @@ class Serializer(object):
 
         return values
 
-    def _normalized_class_str(self, cls_or_str):
-        '''Centralized normalizing logic so we don't have PREFIX sprinkled throughout our functions'''
-        if not isinstance(cls_or_str, str):
-            cls_or_str = cls_or_str.__name__
-        return self._PREFIX + cls_or_str
-
     def _generate_metadata(self, cls, raw_format, attr_converters=None, fmt_converters=None):
             metadata = {}
             metadata['cls'] = cls
             metadata['cls_str'] = cls.__name__
-            metadata['normalized_cls_str'] = self._normalized_class_str(cls)
             metadata['raw_format'] = raw_format
 
             compact_pieces = []
             flat_pieces = []
             for name, format in multidelim_generator(raw_format, ',', '='):
-                if self._has_registered_class(format, normalized=False):
-                    compact_pieces.append('{}={}'.format(self._normalized_class_str(format), name))
-                    flat_pieces.append(self._metadata_field('cls_str', format, 'flat_format'))
+                if format in self._cls:
+                    subcls = self._cls[format]
+                    flat_pieces.append(self._cls_metadata[subcls]['flat_format'])
                 else:
-                    compact_pieces.append('{}={}'.format(format, name))
                     flat_pieces.append(format)
+                compact_pieces.append('{}={}'.format(format, name))
             compact_format = ','.join(compact_pieces)
             flat_format = ','.join(flat_pieces)
             metadata['compact_format'] = compact_format
@@ -164,27 +156,3 @@ class Serializer(object):
             metadata['fmt_converters'] = fmt_converters or {}
 
             return metadata
-
-    def _metadata_field(self, index_type, index_value, metadata_field):
-        '''
-        index_type: string of the type of value you're finding metadata by.  Examples include 'cls' or 'raw_format'.
-        index_value: value of the previous type.  For 'cls' a class object, for 'raw_format' a format string.
-        metadata_field: string of the field type to retrieve.  This can be any of the values for index_type.
-        '''
-        return self._indexes[index_type][index_value][metadata_field]
-
-    def _has_registered_class(self, cls_or_str, normalized=False):
-        '''
-        Takes either a class object or the string of a class name.
-        normalized: True if the cls string is normalized.
-            class: <class 'MySerializableClass'>
-            class string: 'MySerializableClass'
-            normalized class string: 'Serial_MySerializableClass' (or whatever PREFIX is)
-        '''
-
-        if not normalized:
-            normalized_name = self._normalized_class_str(cls_or_str)
-        else:
-            normalized_name = cls_or_str
-        normalized_cls_dicts = self._indexes['normalized_cls_str']
-        return normalized_name in normalized_cls_dicts

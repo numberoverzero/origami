@@ -35,7 +35,7 @@ def _autoserialized(serializer, cls):
     def deserialize(cls, instance, **kwargs):
         if instance is None:
             instance = cls()
-        for attr in serializer._metadata_field('cls', cls, 'attrs'):
+        for attr in serializer._cls_metadata[cls]['attrs']:
             try:
                 setattr(instance, attr, kwargs[attr])
             except KeyError:
@@ -43,8 +43,6 @@ def _autoserialized(serializer, cls):
         return instance
 
     cls.deserialize = deserialize
-
-    # Hook up the serializer so that we don't need to know it to serialize/deserialize objects of this type
     cls._serializer = serializer
 
     return cls
