@@ -1,14 +1,14 @@
 import unittest
-from pyserializable import autoserializer, Serializer, serialize, deserialize
+from pyserializable import serialize, deserialize, serialized
 from pyserializable.tests import equals
 
 
 class AutoserializedTests(unittest.TestCase):
-    '''Unit tests for the @autoserializer() decorator'''
+    '''Unit tests for the @serialized decorator (using global serializer)'''
 
     def setUp(self):
 
-        @autoserializer(Serializer())
+        @serialized
         class Blob(object):
             serial_format = 'n=uint:8'
             clsatr = "Some Value"

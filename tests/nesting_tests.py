@@ -1,24 +1,22 @@
 import unittest
-from pyserializable import autoserializer, Serializer
-from pyserializable.tests import equals
-
+from pyserializable import serialized, serialize, deserialize
+from pyserializable.tests import equals, unique_serializer
 
 class NestingTests(unittest.TestCase):
     '''Unit tests for nested serialization'''
 
     def setUp(self):
-        self.s = Serializer()
-        self.serialized = autoserializer(self.s)
+        self.n, s = unique_serializer()
 
     def testSingleNesting(self):
 
-        @self.serialized
+        @serialized(self.n)
         class Address(object):
             serial_format = 'house_number=uint:7'
 
             __eq__ = equals('house_number')
 
-        @self.serialized
+        @serialized(self.n)
         class Person(object):
             serial_format = 'age=uint:10, address=Address, alive=uint:1'
 
@@ -31,7 +29,7 @@ class NestingTests(unittest.TestCase):
         person.alive = 1
         person.address = address
 
-        data = self.s.serialize(person)
-        other_person = self.s.deserialize(Person, data)
+        data = serialize(person)
+        other_person = deserialize(Person, data)
 
         assert person == other_person

@@ -1,13 +1,15 @@
 import unittest
-from pyserializable import Serializer, serialize, deserialize
-from pyserializable.tests import equals, init
+from pyserializable import serialized, serialize, deserialize
+from pyserializable.tests import equals, init, unique_serializer
 
 
 class DeserializationTests(unittest.TestCase):
     '''Unit tests for basic deserialization'''
 
     def setUp(self):
+        name, self.s = unique_serializer()
 
+        @serialized(name)
         class Blob(object):
             serial_format = 'a=uint:1, b=uint:2, c=uint:3, d=uint:4'
             __init__ = init(*list('abcd'))
@@ -21,11 +23,6 @@ class DeserializationTests(unittest.TestCase):
                 return instance
 
         self.Blob = Blob
-
-        serializer = Serializer()
-        serializer.register(Blob, Blob.serial_format)
-
-        self.s = Blob._serializer = serializer
 
     def testOjbectDeserialization(self):
         '''Deserialize into an object that already exists, not using the class's __init__ function'''
@@ -47,7 +44,7 @@ class DeserializationTests(unittest.TestCase):
         assert blob == other_blob
 
     def testClassSerializerAttribute(self):
-        '''serialize and deserialize should work with the class's _serializer attribute'''
+        '''serialize and deserialize should work with the class's serial_metadata attribute'''
 
         blob = self.Blob(1, 3, 7, 15)
         s = serialize(blob)

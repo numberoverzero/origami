@@ -1,18 +1,18 @@
 import unittest
-from pyserializable import autoserializer, Serializer
-from pyserializable.tests import equals
+from pyserializable import serialized
+from pyserializable.tests import equals, unique_serializer
 
 
 class ConverterTests(unittest.TestCase):
     '''Unit tests for attribute and format converters'''
 
     def setUp(self):
-        self.s = Serializer()
+        self.n, self.s = unique_serializer()
 
     def testEmptyConverters(self):
         '''Empty converters (None or {}) should be fine'''
 
-        @autoserializer(self.s)
+        @serialized(self.n)
         class Blob(object):
             serial_format = 'enabled=uint:1, alpha=uint:8'
             serial_attr_converters = None
@@ -31,7 +31,7 @@ class ConverterTests(unittest.TestCase):
     def testSingleAttrConverter(self):
         '''Attribute converters should work on specified fields'''
 
-        @autoserializer(self.s)
+        @serialized(self.n)
         class Blob(object):
             serial_format = 'enabled=uint:1, r=uint:8, g=uint:8, b=uint:8'
             serial_attr_converters = {'enabled': [int, bool]}
@@ -52,7 +52,7 @@ class ConverterTests(unittest.TestCase):
     def testSingleFmtConverter(self):
         '''Format converters should work on all fields with matching formats'''
 
-        @autoserializer(self.s)
+        @serialized(self.n)
         class Blob(object):
             serial_format = 'enabled=uint:1, r=uint:8, g=uint:8, b=uint:8'
             serial_fmt_converters = {'uint:8': [int, str]}
@@ -77,7 +77,7 @@ class ConverterTests(unittest.TestCase):
             '''If this function is called, then the fmt converter was used instead of the attr converter :('''
             assert False
 
-        @autoserializer(self.s)
+        @serialized(self.n)
         class Blob(object):
             serial_format = 'enabled=uint:1'
             serial_attr_converters = {'enabled': [int, bool]}
