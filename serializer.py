@@ -52,7 +52,7 @@ class Serializer(object):
 
     def serialize(self, obj):
         values = self._get_flat_values(obj)
-        fmt = self._cls_metadata[obj.__class__]['flat_format']
+        fmt = self._cls_metadata[obj.__class__]['bitstring_format']
         return bitstring.pack(fmt, *values)
 
     def deserialize(self, cls_or_obj, data, seek=True):
@@ -81,78 +81,68 @@ class Serializer(object):
         if seek:
             data.pos = 0
 
-        cls_format = self._cls_metadata[cls]['compact_format']
         attr_converters = self._cls_metadata[cls]['attr_converters']
         fmt_converters = self._cls_metadata[cls]['fmt_converters']
 
-        for format, name in multidelim_generator(cls_format, ',', '='):
-            if format in self._cls:
-                subcls = self._cls[format]
-                kwargs[name] = self.deserialize(subcls, data, seek=False)
+        for attr, fmt in self._cls_metadata[cls]['serial_format']:
+            if fmt in self._cls_metadata:
+                kwargs[attr] = self.deserialize(fmt, data, seek=False)
             else:
-                value = data.read(format)
+                value = data.read(fmt)
                 # Check for converters for this object.
                 # Attribute converters take precedence.
-                if name in attr_converters:
-                    value = attr_converters[name][1](value)
-                elif format in fmt_converters:
-                    value = fmt_converters[format][1](value)
-                kwargs[name] = value
+                if attr in attr_converters:
+                    value = attr_converters[attr][1](value)
+                elif fmt in fmt_converters:
+                    value = fmt_converters[fmt][1](value)
+                kwargs[attr] = value
         return cls.deserialize(instance, **kwargs)
 
     def _get_flat_values(self, obj):
         values = []
 
         cls = obj.__class__
-        cls_format = self._cls_metadata[cls]['compact_format']
         attr_converters = self._cls_metadata[cls]['attr_converters']
         fmt_converters = self._cls_metadata[cls]['fmt_converters']
 
-        for format, name in multidelim_generator(cls_format, ',', '='):
+        for attr, fmt in self._cls_metadata[cls]['serial_format']:
             try:
-                data = getattr(obj, name)
+                data = getattr(obj, attr)
             except AttributeError:
-                raise AttributeError(_MISSING_ATTR.format(cls.__name__, name))
+                raise AttributeError(_MISSING_ATTR.format(cls.__name__, attr))
 
-            if format in self._cls:
+            if fmt in self._cls_metadata:
                 # Serializable object, get its attributes
                 sub_values = self._get_flat_values(data)
                 values.extend(sub_values)
             else:
                 # Attribute converters take precedence.
-                if name in attr_converters:
-                    data = attr_converters[name][0](data)
-                elif format in fmt_converters:
-                    data = fmt_converters[format][0](data)
+                if attr in attr_converters:
+                    data = attr_converters[attr][0](data)
+                elif fmt in fmt_converters:
+                    data = fmt_converters[fmt][0](data)
                 values.append(data)
 
         return values
 
-    def _generate_metadata(self, cls, raw_format, attr_converters=None, fmt_converters=None):
-            metadata = {}
-            metadata['cls'] = cls
-            metadata['cls_str'] = cls.__name__
-            metadata['raw_format'] = raw_format
-
-            compact_pieces = []
-            flat_pieces = []
-            for name, format in multidelim_generator(raw_format, ',', '='):
-                if format in self._cls:
-                    subcls = self._cls[format]
-                    flat_pieces.append(self._cls_metadata[subcls]['flat_format'])
+    def _generate_metadata(self, cls, format, attr_converters=None, fmt_converters=None):
+            serial_format, flat = [], []
+            for name, fmt in multidelim_generator(format, ',', '='):
+                if fmt in self._cls:
+                    subcls = self._cls[fmt]
+                    flat.append(self._cls_metadata[subcls]['bitstring_format'])
+                    serial_format.append((name, subcls))
                 else:
-                    flat_pieces.append(format)
-                compact_pieces.append('{}={}'.format(format, name))
-            compact_format = ','.join(compact_pieces)
-            flat_format = ','.join(flat_pieces)
-            metadata['compact_format'] = compact_format
-            metadata['flat_format'] = flat_format
+                    flat.append(fmt)
+                    serial_format.append((name, fmt))
 
-            formats = raw_format.split(',')
-            attrs = [fmt.split('=')[0].strip() for fmt in formats]
-            metadata['attrs'] = attrs
-
-            metadata['attr_converters'] = attr_converters or {}
-            metadata['fmt_converters'] = fmt_converters or {}
+            metadata = {
+                'cls': cls,
+                'cls_str': cls.__name__,
+                'serial_format': serial_format,
+                'bitstring_format': ','.join(flat),
+                'attr_converters': attr_converters or {},
+                'fmt_converters': fmt_converters or {}
+            }
 
             return metadata
