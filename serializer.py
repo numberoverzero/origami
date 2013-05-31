@@ -6,6 +6,10 @@ _DUPLICATE_SERIALIZER = "Cannot register Serializer with name '{}': already regi
 _serializers = {}
 
 
+def get_serializer(registered_name):
+    return _serializers[registered_name]
+
+
 class Serializer(object):
     def __init__(self, registered_name):
         self.registered_classes = []
@@ -25,9 +29,9 @@ class Serializer(object):
                 flat.append(fmt)
                 serial_format.append((name, fmt))
         bitstring_format = ','.join(flat)
-        flat_count = len(bitstring_format.split(','))
-
-        metadata = {
+        flat_count = len(bitstring_format.split(','))  # We have to do this after bitstring is joined because some
+                                                       # pieces will be more than one piece (nested serialization)
+        cls.serial_metadata = {
             'attr_converters': attr_converters or {},
             'bitstring_format': bitstring_format,
             'flat_count': flat_count,
@@ -36,8 +40,6 @@ class Serializer(object):
             'serial_format': serial_format,
 
         }
-
-        cls.serial_metadata = metadata
         self.registered_classes.append(cls)
         self.class_map[cls.__name__] = cls
 
@@ -114,7 +116,3 @@ class Serializer(object):
         else:
             raise ValueError("Don't know how to deserialize {}".format(cls_or_obj))
         return cls, instance
-
-
-def get_serializer(registered_name):
-    return _serializers[registered_name]
