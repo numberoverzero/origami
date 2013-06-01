@@ -1,4 +1,4 @@
-from bitfold.crafter import crafter
+from bitfold.crafter import Crafter
 
 _AUTO_MISSING_ATTR = "Built-in unfold method expected value for attribute '{}' but found none."
 
@@ -12,8 +12,8 @@ def pattern(arg):
         return _wrap_class(None, arg)
 
 
-def _wrap_class(registered_name, cls):
-    crafter(registered_name).register_class(
+def _wrap_class(name, cls):
+    Crafter(name).learn_pattern(
         cls,
         cls.fold_format,
         getattr(cls, 'fold_translators', {})

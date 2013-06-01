@@ -8,12 +8,17 @@ _crafters = {}
 
 
 class Crafter(object):
-    def __init__(self, name):
-        self.name = name
-        self.classes = []
-        self.class_names = {}
+    def __new__(cls, name=None):
+        if not name:
+            name = _global_crafter_id
+        if name not in _crafters:
+            c = _crafters[name] = super(Crafter, cls).__new__(cls)
+            c.name = name
+            c.patterns = []
+            c.pattern_names = {}
+        return _crafters[name]
 
-    def register_class(self, cls, format, translators):
+    def learn_pattern(self, cls, format, translators):
         if not translators:
             translators = {}
         fold_format, bitstring_chunks = [], []
@@ -26,8 +31,8 @@ class Crafter(object):
             if fmt in translators:
                 format_translators[fmt] = translators.pop(fmt)
 
-            if fmt in self.class_names:
-                subcls = self.class_names[fmt]
+            if fmt in self.pattern_names:
+                subcls = self.pattern_names[fmt]
                 bitstring_chunks.append(subcls.fold_metadata['bitstring_format'])
                 fold_format.append((name, subcls))
             else:
@@ -46,8 +51,8 @@ class Crafter(object):
             'format_translators': format_translators
 
         }
-        self.classes.append(cls)
-        self.class_names[cls.__name__] = cls
+        self.patterns.append(cls)
+        self.pattern_names[cls.__name__] = cls
 
     def fold(self, obj):
         values = self._get_flat_values(obj)
@@ -73,7 +78,7 @@ class Crafter(object):
             except AttributeError:
                 raise AttributeError(_MISSING_ATTR.format(obj.__class__.__name__, attr))
 
-            if fmt in self.classes:
+            if fmt in self.patterns:
                 values.extend(self._get_flat_values(data))
             else:
                 if attr in name_translators:
@@ -99,7 +104,7 @@ class Crafter(object):
                 elif fmt in format_translators:
                     value = format_translators[fmt]['unfold'](value)
                 offset = 1
-            elif fmt in self.classes:
+            elif fmt in self.patterns:
                 value = self._obj_from_values(fmt, None, values, pos=pos)
                 offset = fmt.fold_metadata['flat_count']
             kwargs[attr] = value
@@ -110,27 +115,15 @@ class Crafter(object):
         instance = None
 
         #Class object
-        if cls_or_obj in self.classes:
+        if cls_or_obj in self.patterns:
             cls = cls_or_obj
         #Class string
-        elif cls_or_obj in self.class_names:
-            cls = self.class_names[cls_or_obj]
+        elif cls_or_obj in self.pattern_names:
+            cls = self.pattern_names[cls_or_obj]
         #Instance
-        elif cls_or_obj.__class__ in self.classes:
+        elif cls_or_obj.__class__ in self.patterns:
             cls = cls_or_obj.__class__
             instance = cls_or_obj
         else:
             raise ValueError("Don't know how to unfold {}".format(cls_or_obj))
         return cls, instance
-
-
-def crafter(name=None):
-    '''Defaults to global crafter'''
-    if name is None:
-        name = _global_crafter_id
-    if name not in _crafters:
-        _crafter = Crafter(name)
-        _crafters[name] = _crafter
-    return _crafters[name]
-#Initialize global crafter
-crafter()

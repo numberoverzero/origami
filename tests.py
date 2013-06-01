@@ -1,4 +1,4 @@
-from bitfold import crafter, pattern, fold, unfold
+from bitfold import Crafter, pattern, fold, unfold
 from bitstring import CreationError
 import unittest
 import uuid
@@ -23,7 +23,7 @@ def equals(*attrs):
 
 def unique_crafter():
     name = str(uuid.uuid4())
-    _crafter = crafter(name)
+    _crafter = Crafter(name)
     return name, _crafter
 
 
