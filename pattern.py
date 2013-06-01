@@ -1,28 +1,9 @@
-from bitfold.folder import folder
+from bitfold.crafter import crafter
 
 _AUTO_MISSING_ATTR = "Built-in unfold method expected value for attribute '{}' but found none."
 
 
-def fold(obj):
-    cls = obj.__class__
-    if hasattr(cls, 'fold_metadata'):
-        return cls.fold_metadata['folder'].fold(obj)
-    else:
-        raise AttributeError("Couldn't find a folder for object of type '{}'".format(cls.__name__))
-
-
-def unfold(cls_or_obj, data):
-    try:
-        folder = cls_or_obj.fold_metadata['folder']
-    except:
-        try:
-            folder = cls_or_obj.__class__.fold_metadata['folder']
-        except:
-            raise AttributeError("Couldn't find a folder to unfold with.")
-    return folder.unfold(cls_or_obj, data)
-
-
-def foldable(arg):
+def pattern(arg):
     if isinstance(arg, str):
         def class_decorator(cls):
             return _wrap_class(arg, cls)
@@ -32,7 +13,7 @@ def foldable(arg):
 
 
 def _wrap_class(registered_name, cls):
-    folder(registered_name).register_class(
+    crafter(registered_name).register_class(
         cls,
         cls.fold_format,
         getattr(cls, 'fold_translators', {})

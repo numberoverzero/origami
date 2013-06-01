@@ -1,4 +1,6 @@
-from bitfold.fold import fold, unfold, foldable
-from bitfold.folder import folder
+from bitfold.crafter import crafter
+from bitfold.pattern import pattern
+from bitfold.base import fold, unfold
 
-__all__ = ['fold', 'unfold', 'foldable', 'folder']
+__all__ = ['crafter', 'pattern', 'fold', 'unfold']
+#__all__ = ['Crafter', 'fold', 'unfold']

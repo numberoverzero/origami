@@ -3,11 +3,11 @@ import bitstring
 import uuid
 
 _MISSING_ATTR = "'{}' object was missing expected attribute '{}'"
-_global_folder_id = str(uuid.uuid4())
-_folders = {}
+_global_crafter_id = str(uuid.uuid4())
+_crafters = {}
 
 
-class Folder(object):
+class Crafter(object):
     def __init__(self, name):
         self.name = name
         self.classes = []
@@ -41,7 +41,7 @@ class Folder(object):
             'bitstring_format': bitstring_format,
             'fold_format': fold_format,
             'flat_count': flat_count,
-            'folder': self,
+            'crafter': self,
             'name_translators': name_translators,
             'format_translators': format_translators
 
@@ -124,13 +124,13 @@ class Folder(object):
         return cls, instance
 
 
-def folder(name=None):
-    '''Defaults to global folder'''
+def crafter(name=None):
+    '''Defaults to global crafter'''
     if name is None:
-        name = _global_folder_id
-    if name not in _folders:
-        _folder = Folder(name)
-        _folders[name] = _folder
-    return _folders[name]
-#Initialize global folder
-folder()
+        name = _global_crafter_id
+    if name not in _crafters:
+        _crafter = Crafter(name)
+        _crafters[name] = _crafter
+    return _crafters[name]
+#Initialize global crafter
+crafter()

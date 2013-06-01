@@ -1,4 +1,4 @@
-from bitfold import fold, unfold, foldable, folder
+from bitfold import crafter, pattern, fold, unfold
 from bitstring import CreationError
 import unittest
 import uuid
@@ -21,17 +21,17 @@ def equals(*attrs):
     return eq
 
 
-def unique_folder():
+def unique_crafter():
     name = str(uuid.uuid4())
-    _folder = folder(name)
-    return name, _folder
+    _crafter = crafter(name)
+    return name, _crafter
 
 
 class GlobalFolderTests(unittest.TestCase):
-    '''Unit tests for the @foldable decorator (using global folder)'''
+    '''Unit tests for the @pattern decorator (using global crafter)'''
 
     def setUp(self):
-        @foldable
+        @pattern
         class Blob(object):
             fold_format = 'n=uint:8'
             clsatr = "Some Value"
@@ -46,7 +46,7 @@ class GlobalFolderTests(unittest.TestCase):
         self.Blob = Blob
 
     def testClassAttributesUnchanged(self):
-        '''@foldable decorator shouldn't modify existing class attributes'''
+        '''@pattern decorator shouldn't modify existing class attributes'''
         blob = self.Blob('full')
 
         assert blob.n == 'full'
@@ -98,12 +98,12 @@ class TranslatorTests(unittest.TestCase):
     '''Unit tests for attribute and format translators'''
 
     def setUp(self):
-        self.n, self.f = unique_folder()
+        self.n, self.f = unique_crafter()
 
     def testNoTranslators(self):
         '''No fold_translators attribute defined'''
 
-        @foldable(self.n)
+        @pattern(self.n)
         class Blob(object):
             fold_format = 'enabled=uint:1, alpha=uint:8'
 
@@ -120,7 +120,7 @@ class TranslatorTests(unittest.TestCase):
     def testTranslatorsIsNone(self):
         '''fold_translators attribute is None'''
 
-        @foldable(self.n)
+        @pattern(self.n)
         class Blob(object):
             fold_format = 'enabled=uint:1, alpha=uint:8'
             fold_translators = None
@@ -138,7 +138,7 @@ class TranslatorTests(unittest.TestCase):
     def testTranslatorsIsEmpty(self):
         '''fold_translators attribute is {}'''
 
-        @foldable(self.n)
+        @pattern(self.n)
         class Blob(object):
             fold_format = 'enabled=uint:1, alpha=uint:8'
             fold_translators = {}
@@ -156,7 +156,7 @@ class TranslatorTests(unittest.TestCase):
     def testSingleNamedTranslator(self):
         '''Named translators should work on specified fields'''
 
-        @foldable(self.n)
+        @pattern(self.n)
         class Blob(object):
             fold_format = 'enabled=uint:1, r=uint:8, g=uint:8, b=uint:8'
             fold_translators = {'enabled': {'fold': int, 'unfold': bool}}
@@ -177,7 +177,7 @@ class TranslatorTests(unittest.TestCase):
     def testSingleFormatTranslator(self):
         '''Format translators should work on all fields with matching formats'''
 
-        @foldable(self.n)
+        @pattern(self.n)
         class Blob(object):
             fold_format = 'enabled=uint:1, r=uint:8, g=uint:8, b=uint:8'
             fold_translators = {'uint:8': {'fold': int, 'unfold': str}}
@@ -201,7 +201,7 @@ class TranslatorTests(unittest.TestCase):
         def never_call(arg):
             assert False
 
-        @foldable(self.n)
+        @pattern(self.n)
         class Blob(object):
             fold_format = 'enabled=uint:1'
             fold_translators = {
@@ -224,17 +224,17 @@ class NestingTests(unittest.TestCase):
     '''Unit tests for nested folding'''
 
     def setUp(self):
-        self.n, f = unique_folder()
+        self.n, f = unique_crafter()
 
     def testSingleNesting(self):
 
-        @foldable(self.n)
+        @pattern(self.n)
         class Address(object):
             fold_format = 'house_number=uint:7'
 
             __eq__ = equals('house_number')
 
-        @foldable(self.n)
+        @pattern(self.n)
         class Person(object):
             fold_format = 'age=uint:10, address=Address, alive=uint:1'
 
@@ -257,9 +257,9 @@ class UnfoldTests(unittest.TestCase):
     '''Unit tests for basic unfolding'''
 
     def setUp(self):
-        name, self.f = unique_folder()
+        name, self.f = unique_crafter()
 
-        @foldable(name)
+        @pattern(name)
         class Blob(object):
             fold_format = 'a=uint:1, b=uint:2, c=uint:3, d=uint:4'
             __init__ = init(*list('abcd'))
@@ -312,9 +312,9 @@ class SerializationTests(unittest.TestCase):
     '''Unit tests for basic serialization validation and errors'''
 
     def setUp(self):
-        name, f = unique_folder()
+        name, f = unique_crafter()
 
-        @foldable(name)
+        @pattern(name)
         class Blob(object):
             fold_format = 'a=uint:1, b=uint:2, c=uint:3, d=uint:4'
             __init__ = init(*list('abcd'))
