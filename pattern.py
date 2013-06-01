@@ -15,8 +15,8 @@ def pattern(arg):
 def _wrap_class(name, cls):
     Crafter(name).learn_pattern(
         cls,
-        cls.fold_format,
-        getattr(cls, 'fold_translators', {})
+        cls.origami_folds,
+        getattr(cls, 'origami_creases', {})
     )
 
     if hasattr(cls, 'unfold'):
@@ -26,7 +26,7 @@ def _wrap_class(name, cls):
     def unfold(cls, crafter_name, instance, **kwargs):
         if instance is None:
             instance = cls()
-        for attr, fmt in Crafter(crafter_name).patterns[cls]['fold_format']:
+        for attr, fmt in Crafter(crafter_name).patterns[cls]['origami_folds']:
             try:
                 setattr(instance, attr, kwargs[attr])
             except KeyError:

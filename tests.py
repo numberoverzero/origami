@@ -33,7 +33,7 @@ class GlobalFolderTests(unittest.TestCase):
     def setUp(self):
         @pattern
         class Blob(object):
-            fold_format = 'n=uint:8'
+            origami_folds = 'n=uint:8'
             clsatr = "Some Value"
             init_calls = 0
 
@@ -95,17 +95,17 @@ class GlobalFolderTests(unittest.TestCase):
 
 
 class TranslatorTests(unittest.TestCase):
-    '''Unit tests for attribute and format translators'''
+    '''Unit tests for attribute and format creases'''
 
     def setUp(self):
         self.n, self.f = unique_crafter()
 
     def testNoTranslators(self):
-        '''No fold_translators attribute defined'''
+        '''No origami_creases attribute defined'''
 
         @pattern(self.n)
         class Blob(object):
-            fold_format = 'enabled=uint:1, alpha=uint:8'
+            origami_folds = 'enabled=uint:1, alpha=uint:8'
 
             __eq__ = equals('enabled', 'alpha')
 
@@ -118,12 +118,12 @@ class TranslatorTests(unittest.TestCase):
         assert blob == other_blob
 
     def testTranslatorsIsNone(self):
-        '''fold_translators attribute is None'''
+        '''origami_creases attribute is None'''
 
         @pattern(self.n)
         class Blob(object):
-            fold_format = 'enabled=uint:1, alpha=uint:8'
-            fold_translators = None
+            origami_folds = 'enabled=uint:1, alpha=uint:8'
+            origami_creases = None
 
             __eq__ = equals('enabled', 'alpha')
 
@@ -136,12 +136,12 @@ class TranslatorTests(unittest.TestCase):
         assert blob == other_blob
 
     def testTranslatorsIsEmpty(self):
-        '''fold_translators attribute is {}'''
+        '''origami_creases attribute is {}'''
 
         @pattern(self.n)
         class Blob(object):
-            fold_format = 'enabled=uint:1, alpha=uint:8'
-            fold_translators = {}
+            origami_folds = 'enabled=uint:1, alpha=uint:8'
+            origami_creases = {}
 
             __eq__ = equals('enabled', 'alpha')
 
@@ -154,12 +154,12 @@ class TranslatorTests(unittest.TestCase):
         assert blob == other_blob
 
     def testSingleNamedTranslator(self):
-        '''Named translators should work on specified fields'''
+        '''Named creases should work on specified fields'''
 
         @pattern(self.n)
         class Blob(object):
-            fold_format = 'enabled=uint:1, r=uint:8, g=uint:8, b=uint:8'
-            fold_translators = {'enabled': {'fold': int, 'unfold': bool}}
+            origami_folds = 'enabled=uint:1, r=uint:8, g=uint:8, b=uint:8'
+            origami_creases = {'enabled': {'fold': int, 'unfold': bool}}
 
             __eq__ = equals('enabled', 'r', 'g', 'b')
 
@@ -175,12 +175,12 @@ class TranslatorTests(unittest.TestCase):
         assert blob == other_blob
 
     def testSingleFormatTranslator(self):
-        '''Format translators should work on all fields with matching formats'''
+        '''Format creases should work on all fields with matching formats'''
 
         @pattern(self.n)
         class Blob(object):
-            fold_format = 'enabled=uint:1, r=uint:8, g=uint:8, b=uint:8'
-            fold_translators = {'uint:8': {'fold': int, 'unfold': str}}
+            origami_folds = 'enabled=uint:1, r=uint:8, g=uint:8, b=uint:8'
+            origami_creases = {'uint:8': {'fold': int, 'unfold': str}}
 
             __eq__ = equals('enabled', 'r', 'g', 'b')
 
@@ -196,15 +196,15 @@ class TranslatorTests(unittest.TestCase):
         assert blob == other_blob
 
     def testNamedTranslatorsTakePrecedence(self):
-        '''When a value is covered by both types of translators, only the name translator should be used.'''
+        '''When a value is covered by both types of creases, only the name creases should be used.'''
 
         def never_call(arg):
             assert False
 
         @pattern(self.n)
         class Blob(object):
-            fold_format = 'enabled=uint:1'
-            fold_translators = {
+            origami_folds = 'enabled=uint:1'
+            origami_creases = {
                 'enabled': {'fold': int, 'unfold': bool},
                 'uint:1': {'fold': never_call, 'unfold': never_call}
             }
@@ -230,13 +230,13 @@ class NestingTests(unittest.TestCase):
 
         @pattern(self.n)
         class Address(object):
-            fold_format = 'house_number=uint:7'
+            origami_folds = 'house_number=uint:7'
 
             __eq__ = equals('house_number')
 
         @pattern(self.n)
         class Person(object):
-            fold_format = 'age=uint:10, address=Address, alive=uint:1'
+            origami_folds = 'age=uint:10, address=Address, alive=uint:1'
 
             __eq__ = equals('age', 'address', 'alive')
 
@@ -261,7 +261,7 @@ class UnfoldTests(unittest.TestCase):
 
         @pattern(name)
         class Blob(object):
-            fold_format = 'a=uint:1, b=uint:2, c=uint:3, d=uint:4'
+            origami_folds = 'a=uint:1, b=uint:2, c=uint:3, d=uint:4'
             __init__ = init(*list('abcd'))
             __eq__ = equals(*list('abcd'))
 
@@ -316,7 +316,7 @@ class SerializationTests(unittest.TestCase):
 
         @pattern(name)
         class Blob(object):
-            fold_format = 'a=uint:1, b=uint:2, c=uint:3, d=uint:4'
+            origami_folds = 'a=uint:1, b=uint:2, c=uint:3, d=uint:4'
             __init__ = init(*list('abcd'))
 
         self.Blob = Blob
@@ -324,7 +324,7 @@ class SerializationTests(unittest.TestCase):
     def testFoldedLength(self):
         '''
         The length of the folded data in bits should be the sum
-        of the bit-widths of its class's fold_format field
+        of the bit-widths of its class's origami_folds field
         '''
         blob = self.Blob(1, 3, 7, 15)
         s = fold(blob)
@@ -345,7 +345,7 @@ class SerializationTests(unittest.TestCase):
     def testFoldMissingAttribute(self):
         '''
         When an object to be folded is missing attributes named in
-        it's class's fold_format string, an AttributeError is thrown.
+        it's class's origami_folds string, an AttributeError is thrown.
         '''
 
         blob = self.Blob(0)

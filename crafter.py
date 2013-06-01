@@ -17,37 +17,37 @@ class Crafter(object):
             c.patterns = {}
         return _crafters[name]
 
-    def learn_pattern(self, cls, format, translators):
-        if not translators:
-            translators = {}
-        fold_format, bitstring_chunks = [], []
-        name_translators = {}
-        format_translators = {}
+    def learn_pattern(self, cls, format, creases):
+        if not creases:
+            creases = {}
+        origami_folds, bitstring_chunks = [], []
+        name_creases = {}
+        format_creases = {}
 
         for name, fmt in multidelim_generator(format, ',', '='):
-            if name in translators:
-                name_translators[name] = translators.pop(name)
-            if fmt in translators:
-                format_translators[fmt] = translators.pop(fmt)
+            if name in creases:
+                name_creases[name] = creases.pop(name)
+            if fmt in creases:
+                format_creases[fmt] = creases.pop(fmt)
 
             if fmt in self.patterns:
                 subcls = self.patterns[fmt]
                 subcls_fmt = self.patterns[subcls]['bitstring_format']
                 bitstring_chunks.append(subcls_fmt)
-                fold_format.append((name, subcls))
+                origami_folds.append((name, subcls))
             else:
                 bitstring_chunks.append(fmt)
-                fold_format.append((name, fmt))
+                origami_folds.append((name, fmt))
 
         bitstring_format = ','.join(bitstring_chunks)
         flat_count = len(bitstring_format.split(','))  # We have to do this after bitstring is joined because some
                                                        # pieces will be more than one piece (nested folding)
         fold_metadata = {
             'bitstring_format': bitstring_format,
-            'fold_format': fold_format,
+            'origami_folds': origami_folds,
             'flat_count': flat_count,
-            'name_translators': name_translators,
-            'format_translators': format_translators
+            'name_creases': name_creases,
+            'format_creases': format_creases
         }
         self.patterns[cls] = fold_metadata
         self.patterns[cls.__name__] = cls
@@ -69,10 +69,10 @@ class Crafter(object):
         values = []
 
         meta = self.patterns[obj.__class__]
-        name_translators = meta['name_translators']
-        format_translators = meta['format_translators']
+        name_creases = meta['name_creases']
+        format_creases = meta['format_creases']
 
-        for attr, fmt in meta['fold_format']:
+        for attr, fmt in meta['origami_folds']:
             try:
                 data = getattr(obj, attr)
             except AttributeError:
@@ -81,10 +81,10 @@ class Crafter(object):
             if fmt in self.patterns:
                 values.extend(self._get_flat_values(data))
             else:
-                if attr in name_translators:
-                    data = name_translators[attr]['fold'](data)
-                elif fmt in format_translators:
-                    data = format_translators[fmt]['fold'](data)
+                if attr in name_creases:
+                    data = name_creases[attr]['fold'](data)
+                elif fmt in format_creases:
+                    data = format_creases[fmt]['fold'](data)
                 values.append(data)
         return values
 
@@ -92,17 +92,17 @@ class Crafter(object):
         kwargs = {}
 
         meta = self.patterns[cls]
-        format = meta['fold_format']
-        name_translators = meta['name_translators']
-        format_translators = meta['format_translators']
+        format = meta['origami_folds']
+        name_creases = meta['name_creases']
+        format_creases = meta['format_creases']
 
         for attr, fmt in format:
             if isinstance(fmt, str):
                 value = values[pos]
-                if attr in name_translators:
-                    value = name_translators[attr]['unfold'](value)
-                elif fmt in format_translators:
-                    value = format_translators[fmt]['unfold'](value)
+                if attr in name_creases:
+                    value = name_creases[attr]['unfold'](value)
+                elif fmt in format_creases:
+                    value = format_creases[fmt]['unfold'](value)
                 offset = 1
             elif fmt in self.patterns:
                 value = self._obj_from_values(fmt, None, values, pos=pos)
