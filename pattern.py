@@ -3,35 +3,31 @@ from origami.crafter import Crafter
 _AUTO_MISSING_ATTR = "Built-in unfold method expected value for attribute '{}' but found none."
 
 
-def pattern(arg):
-    if isinstance(arg, str):
-        def class_decorator(cls):
-            return _wrap_class(arg, cls)
-        return class_decorator
-    else:
-        return _wrap_class(None, arg)
+def pattern(crafter='global', default=True, unfold=True):
+    def wrap_class(cls):
+        c = Crafter(crafter)
 
+        if unfold:
+            @classmethod
+            def cls_unfold(cls, name, instance, **kwargs):
+                if instance is None:
+                    instance = cls()
+                for attr, fmt in Crafter(name).patterns[cls]['folds']:
+                    try:
+                        setattr(instance, attr, kwargs[attr])
+                    except KeyError:
+                        raise AttributeError(_AUTO_MISSING_ATTR.format(attr))
+                return instance
+            cls.unfold = cls_unfold
 
-def _wrap_class(name, cls):
-    Crafter(name).learn_pattern(
-        cls,
-        cls.origami_folds,
-        getattr(cls, 'origami_creases', {})
-    )
+        unfold_func = cls.unfold
+        folds = cls.origami_folds
+        creases = getattr(cls, 'origami_creases', {})
 
-    if hasattr(cls, 'unfold'):
+        c.learn_pattern(cls, unfold_func, folds, creases)
+
+        if default:
+            cls._crafter = c
+
         return cls
-
-    @classmethod
-    def unfold(cls, crafter_name, instance, **kwargs):
-        if instance is None:
-            instance = cls()
-        for attr, fmt in Crafter(crafter_name).patterns[cls]['origami_folds']:
-            try:
-                setattr(instance, attr, kwargs[attr])
-            except KeyError:
-                raise AttributeError(_AUTO_MISSING_ATTR.format(attr))
-        return instance
-    cls.unfold = unfold
-
-    return cls
+    return wrap_class

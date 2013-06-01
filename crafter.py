@@ -1,31 +1,32 @@
 from origami.util import multidelim_generator, validate_bitstring_format
 import bitstring
-import uuid
 
 _MISSING_ATTR = "'{}' object was missing expected attribute '{}'"
 _UNKNOWN_FMT = "Ecountered unknown fold '{}' while learning pattern '{}'"
-_global_crafter_id = str(uuid.uuid4())
+_ALREADY_SEEN_PATTERN = "Crafter '{}' cannot learn pattern '{}': Already known"
 _crafters = {}
 
 
 class Crafter(object):
-    def __new__(cls, name=None):
-        if not name:
-            name = _global_crafter_id
+    def __new__(cls, name='global'):
         if name not in _crafters:
             c = _crafters[name] = super(Crafter, cls).__new__(cls)
             c.name = name
             c.patterns = {}
         return _crafters[name]
 
-    def learn_pattern(self, cls, format, creases):
-        if not creases:
-            creases = {}
-        origami_folds, bitstring_chunks = [], []
+    def learn_pattern(self, cls, unfold_func, folds, creases):
+        if cls.__name__ in self.patterns:
+            raise KeyError(_ALREADY_SEEN_PATTERN.format(self.name, cls))
+        else:
+            print self.patterns
+        processed_folds, bitstring_chunks = [], []
+
+        creases = creases or {}
         name_creases = {}
         format_creases = {}
 
-        for name, fmt in multidelim_generator(format, ',', '='):
+        for name, fmt in multidelim_generator(folds, ',', '='):
             if name in creases:
                 name_creases[name] = creases.pop(name)
             if fmt in creases:
@@ -35,10 +36,10 @@ class Crafter(object):
                 subcls = self.patterns[fmt]
                 subcls_fmt = self.patterns[subcls]['bitstring_format']
                 bitstring_chunks.append(subcls_fmt)
-                origami_folds.append((name, subcls))
+                processed_folds.append((name, subcls))
             elif validate_bitstring_format(fmt):
                 bitstring_chunks.append(fmt)
-                origami_folds.append((name, fmt))
+                processed_folds.append((name, fmt))
             else:
                 raise ValueError(_UNKNOWN_FMT.format(fmt, cls.__name__))
 
@@ -47,15 +48,14 @@ class Crafter(object):
                                                        # pieces will be more than one piece (nested folding)
         fold_metadata = {
             'bitstring_format': bitstring_format,
-            'origami_folds': origami_folds,
+            'folds': processed_folds,
+            'unfold': unfold_func,
             'flat_count': flat_count,
             'name_creases': name_creases,
             'format_creases': format_creases
         }
         self.patterns[cls] = fold_metadata
         self.patterns[cls.__name__] = cls
-        if not getattr(cls, '_default_crafter', None):
-            cls._default_crafter = self
 
     def fold(self, obj):
         values = self._get_flat_values(obj)
@@ -75,7 +75,7 @@ class Crafter(object):
         name_creases = meta['name_creases']
         format_creases = meta['format_creases']
 
-        for attr, fmt in meta['origami_folds']:
+        for attr, fmt in meta['folds']:
             try:
                 data = getattr(obj, attr)
             except AttributeError:
@@ -95,7 +95,7 @@ class Crafter(object):
         kwargs = {}
 
         meta = self.patterns[cls]
-        format = meta['origami_folds']
+        format = meta['folds']
         name_creases = meta['name_creases']
         format_creases = meta['format_creases']
 
@@ -112,7 +112,7 @@ class Crafter(object):
                 offset = self.patterns[fmt]['flat_count']
             kwargs[attr] = value
             pos += offset
-        return cls.unfold(self.name, instance, **kwargs)
+        return self.patterns[cls]['unfold'](self.name, instance, **kwargs)
 
     def _get_cls_obj(self, cls_or_obj):
         instance = None

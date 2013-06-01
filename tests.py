@@ -22,16 +22,14 @@ def equals(*attrs):
 
 
 def unique_crafter():
-    name = str(uuid.uuid4())
-    _crafter = Crafter(name)
-    return name, _crafter
+    return str(uuid.uuid4())
 
 
 class GlobalFolderTests(unittest.TestCase):
     '''Unit tests for the @pattern decorator (using global crafter)'''
 
     def setUp(self):
-        @pattern
+        @pattern()
         class Blob(object):
             origami_folds = 'n=uint:8'
             clsatr = "Some Value"
@@ -45,6 +43,10 @@ class GlobalFolderTests(unittest.TestCase):
 
         self.Blob = Blob
 
+    def tearDown(self):
+        # Dump learned patterns or we'll hit key errors when we recreate Blob in setUp
+        Crafter('global').patterns = {}
+
     def testClassAttributesUnchanged(self):
         '''@pattern decorator shouldn't modify existing class attributes'''
         blob = self.Blob('full')
@@ -53,12 +55,18 @@ class GlobalFolderTests(unittest.TestCase):
         assert blob.clsatr == "Some Value"
         assert self.Blob.clsatr == "Some Value"
 
+    def testCannotRegisterSameClassName(self):
+        with self.assertRaises(KeyError):
+            @pattern()
+            class Blob(object):
+                origami_folds = 'o=uint:9'
+
     def testUnfoldMethodUsesDefaultInit(self):
         '''
         When None is passed to the unfold method on the class, the default constructor should be called.
         '''
         data = {'n': 'full'}
-        blob = self.Blob.unfold(None, None, **data)
+        blob = self.Blob.unfold('global', None, **data)
 
         assert blob.n == 'full'
         assert self.Blob.init_calls > 0
@@ -69,7 +77,7 @@ class GlobalFolderTests(unittest.TestCase):
         '''
         data = {'n': 'full'}
         blob = self.Blob('empty')
-        blob = self.Blob.unfold(None, blob, **data)
+        blob = self.Blob.unfold('global', blob, **data)
 
         assert blob.n == 'full'
         assert self.Blob.init_calls == 1
@@ -79,7 +87,7 @@ class GlobalFolderTests(unittest.TestCase):
         Passing extra kwargs to the unfold method on the class should be ok.
         '''
         data = {'n': 'full', 'junk': 'unused'}
-        blob = self.Blob.unfold(None, None, **data)
+        blob = self.Blob.unfold('global', None, **data)
 
         assert blob.n == 'full'
         assert not hasattr(blob, 'junk')
@@ -89,7 +97,7 @@ class GlobalFolderTests(unittest.TestCase):
         Passing too few kwargs to the unfold method on the class should raise an AttributeError.
         '''
         data = {'junk': 'unused'}
-        try_unfold = lambda: self.Blob.unfold(None, None, **data)
+        try_unfold = lambda: self.Blob.unfold('global', None, **data)
 
         self.assertRaises(AttributeError, try_unfold)
 
@@ -98,7 +106,8 @@ class TranslatorTests(unittest.TestCase):
     '''Unit tests for attribute and format creases'''
 
     def setUp(self):
-        self.n, self.f = unique_crafter()
+        self.n = unique_crafter()
+        self.c = Crafter(self.n)
 
     def testNoTranslators(self):
         '''No origami_creases attribute defined'''
@@ -113,8 +122,8 @@ class TranslatorTests(unittest.TestCase):
         blob.enabled = 1
         blob.alpha = 127
 
-        data = self.f.fold(blob)
-        other_blob = self.f.unfold(Blob, data)
+        data = self.c.fold(blob)
+        other_blob = self.c.unfold(Blob, data)
         assert blob == other_blob
 
     def testTranslatorsIsNone(self):
@@ -131,8 +140,8 @@ class TranslatorTests(unittest.TestCase):
         blob.enabled = 1
         blob.alpha = 127
 
-        data = self.f.fold(blob)
-        other_blob = self.f.unfold(Blob, data)
+        data = self.c.fold(blob)
+        other_blob = self.c.unfold(Blob, data)
         assert blob == other_blob
 
     def testTranslatorsIsEmpty(self):
@@ -149,8 +158,8 @@ class TranslatorTests(unittest.TestCase):
         blob.enabled = 1
         blob.alpha = 127
 
-        data = self.f.fold(blob)
-        other_blob = self.f.unfold(Blob, data)
+        data = self.c.fold(blob)
+        other_blob = self.c.unfold(Blob, data)
         assert blob == other_blob
 
     def testSingleNamedTranslator(self):
@@ -169,8 +178,8 @@ class TranslatorTests(unittest.TestCase):
         blob.g = 128
         blob.b = 129
 
-        data = self.f.fold(blob)
-        other_blob = self.f.unfold(Blob, data)
+        data = self.c.fold(blob)
+        other_blob = self.c.unfold(Blob, data)
 
         assert blob == other_blob
 
@@ -190,8 +199,8 @@ class TranslatorTests(unittest.TestCase):
         blob.g = '128'
         blob.b = '129'
 
-        data = self.f.fold(blob)
-        other_blob = self.f.unfold(Blob, data)
+        data = self.c.fold(blob)
+        other_blob = self.c.unfold(Blob, data)
 
         assert blob == other_blob
 
@@ -214,8 +223,8 @@ class TranslatorTests(unittest.TestCase):
         blob = Blob()
         blob.enabled = True
 
-        data = self.f.fold(blob)
-        other_blob = self.f.unfold(Blob, data)
+        data = self.c.fold(blob)
+        other_blob = self.c.unfold(Blob, data)
 
         assert blob == other_blob
 
@@ -224,7 +233,7 @@ class NestingTests(unittest.TestCase):
     '''Unit tests for nested folding'''
 
     def setUp(self):
-        self.n, f = unique_crafter()
+        self.n = unique_crafter()
 
     def testSingleNesting(self):
 
@@ -248,7 +257,7 @@ class NestingTests(unittest.TestCase):
         person.address = address
 
         data = fold(person)
-        other_person = unfold(Person, data)
+        other_person = unfold(Person, data, self.n)
 
         assert person == other_person
 
@@ -283,9 +292,10 @@ class UnfoldTests(unittest.TestCase):
     '''Unit tests for basic unfolding'''
 
     def setUp(self):
-        name, self.f = unique_crafter()
+        self.n = unique_crafter()
+        self.c = Crafter(self.n)
 
-        @pattern(name)
+        @pattern(self.n, unfold=False)
         class Blob(object):
             origami_folds = 'a=uint:1, b=uint:2, c=uint:3, d=uint:4'
             __init__ = init(*list('abcd'))
@@ -305,18 +315,18 @@ class UnfoldTests(unittest.TestCase):
 
         blob = self.Blob(1, 3, 7, 15)
         other_blob = self.Blob()
-        folded_blob = self.f.fold(blob)
+        folded_blob = self.c.fold(blob)
 
-        self.f.unfold(other_blob, folded_blob)
+        self.c.unfold(other_blob, folded_blob)
         assert blob == other_blob
 
     def testClassUnfolding(self):
         '''Unfold against a class, using the class's __init__ function'''
 
         blob = self.Blob(1, 3, 7, 15)
-        folded_blob = self.f.fold(blob)
+        folded_blob = self.c.fold(blob)
 
-        other_blob = self.f.unfold(self.Blob, folded_blob)
+        other_blob = self.c.unfold(self.Blob, folded_blob)
         assert blob == other_blob
 
     def testClassFoldAttribute(self):
@@ -325,22 +335,21 @@ class UnfoldTests(unittest.TestCase):
         blob = self.Blob(1, 3, 7, 15)
         s = fold(blob)
 
-        other_blob = unfold(self.Blob, s)
+        other_blob = unfold(self.Blob, s, self.n)
 
         some_other_blob = self.Blob('wat', 'oh', 'god', 'no')
-        unfold(some_other_blob, s)
+        unfold(some_other_blob, s, self.n)
 
         assert blob == other_blob
         assert blob == some_other_blob
 
 
-class SerializationTests(unittest.TestCase):
-    '''Unit tests for basic serialization validation and errors'''
+class FoldingTests(unittest.TestCase):
+    '''Unit tests for basic folding validation and errors'''
 
     def setUp(self):
-        name, f = unique_crafter()
 
-        @pattern(name)
+        @pattern(unique_crafter())
         class Blob(object):
             origami_folds = 'a=uint:1, b=uint:2, c=uint:3, d=uint:4'
             __init__ = init(*list('abcd'))
