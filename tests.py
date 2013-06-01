@@ -252,6 +252,32 @@ class NestingTests(unittest.TestCase):
 
         assert person == other_person
 
+    def testInvalidFolds(self):
+
+        # Unknown format
+        with self.assertRaises(ValueError):
+            @pattern(self.n)
+            class Foo1(object):
+                origami_folds = 'bar=BADFORMAT'
+
+        # Invalid length specification
+        with self.assertRaises(ValueError):
+            @pattern(self.n)
+            class Foo2(object):
+                origami_folds = 'bar=uint:NAN'
+
+        # Missing required length
+        with self.assertRaises(ValueError):
+            @pattern(self.n)
+            class Foo3(object):
+                origami_folds = 'bar=uint'
+
+        # Passed length when none is required
+        with self.assertRaises(ValueError):
+            @pattern(self.n)
+            class Foo4(object):
+                origami_folds = 'bar=bool:10'
+
 
 class UnfoldTests(unittest.TestCase):
     '''Unit tests for basic unfolding'''

@@ -1,8 +1,9 @@
-from origami.util import multidelim_generator
+from origami.util import multidelim_generator, validate_bitstring_format
 import bitstring
 import uuid
 
 _MISSING_ATTR = "'{}' object was missing expected attribute '{}'"
+_UNKNOWN_FMT = "Ecountered unknown fold '{}' while learning pattern '{}'"
 _global_crafter_id = str(uuid.uuid4())
 _crafters = {}
 
@@ -35,9 +36,11 @@ class Crafter(object):
                 subcls_fmt = self.patterns[subcls]['bitstring_format']
                 bitstring_chunks.append(subcls_fmt)
                 origami_folds.append((name, subcls))
-            else:
+            elif validate_bitstring_format(fmt):
                 bitstring_chunks.append(fmt)
                 origami_folds.append((name, fmt))
+            else:
+                raise ValueError(_UNKNOWN_FMT.format(fmt, cls.__name__))
 
         bitstring_format = ','.join(bitstring_chunks)
         flat_count = len(bitstring_format.split(','))  # We have to do this after bitstring is joined because some
