@@ -1,4 +1,4 @@
-from bitfold.crafter import Crafter
+from origami.crafter import Crafter
 
 _AUTO_MISSING_ATTR = "Built-in unfold method expected value for attribute '{}' but found none."
 
@@ -23,10 +23,10 @@ def _wrap_class(name, cls):
         return cls
 
     @classmethod
-    def unfold(cls, instance, **kwargs):
+    def unfold(cls, crafter_name, instance, **kwargs):
         if instance is None:
             instance = cls()
-        for attr, fmt in cls.fold_metadata['fold_format']:
+        for attr, fmt in Crafter(crafter_name).patterns[cls]['fold_format']:
             try:
                 setattr(instance, attr, kwargs[attr])
             except KeyError:

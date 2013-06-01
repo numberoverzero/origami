@@ -1,4 +1,4 @@
-from bitfold import Crafter, pattern, fold, unfold
+from origami import Crafter, pattern, fold, unfold
 from bitstring import CreationError
 import unittest
 import uuid
@@ -58,7 +58,7 @@ class GlobalFolderTests(unittest.TestCase):
         When None is passed to the unfold method on the class, the default constructor should be called.
         '''
         data = {'n': 'full'}
-        blob = self.Blob.unfold(None, **data)
+        blob = self.Blob.unfold(None, None, **data)
 
         assert blob.n == 'full'
         assert self.Blob.init_calls > 0
@@ -69,7 +69,7 @@ class GlobalFolderTests(unittest.TestCase):
         '''
         data = {'n': 'full'}
         blob = self.Blob('empty')
-        blob = self.Blob.unfold(blob, **data)
+        blob = self.Blob.unfold(None, blob, **data)
 
         assert blob.n == 'full'
         assert self.Blob.init_calls == 1
@@ -79,7 +79,7 @@ class GlobalFolderTests(unittest.TestCase):
         Passing extra kwargs to the unfold method on the class should be ok.
         '''
         data = {'n': 'full', 'junk': 'unused'}
-        blob = self.Blob.unfold(None, **data)
+        blob = self.Blob.unfold(None, None, **data)
 
         assert blob.n == 'full'
         assert not hasattr(blob, 'junk')
@@ -89,7 +89,7 @@ class GlobalFolderTests(unittest.TestCase):
         Passing too few kwargs to the unfold method on the class should raise an AttributeError.
         '''
         data = {'junk': 'unused'}
-        try_unfold = lambda: self.Blob.unfold(None, **data)
+        try_unfold = lambda: self.Blob.unfold(None, None, **data)
 
         self.assertRaises(AttributeError, try_unfold)
 
@@ -266,7 +266,7 @@ class UnfoldTests(unittest.TestCase):
             __eq__ = equals(*list('abcd'))
 
             @classmethod
-            def unfold(cls, instance, **kwargs):
+            def unfold(cls, crafter_name, instance, **kwargs):
                 instance = instance or cls()
                 for attr, value in kwargs.items():
                     setattr(instance, attr, value)

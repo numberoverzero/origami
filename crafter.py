@@ -1,4 +1,4 @@
-from bitfold.util import multidelim_generator
+from origami.util import multidelim_generator
 import bitstring
 import uuid
 
@@ -14,8 +14,7 @@ class Crafter(object):
         if name not in _crafters:
             c = _crafters[name] = super(Crafter, cls).__new__(cls)
             c.name = name
-            c.patterns = []
-            c.pattern_names = {}
+            c.patterns = {}
         return _crafters[name]
 
     def learn_pattern(self, cls, format, translators):
@@ -31,9 +30,10 @@ class Crafter(object):
             if fmt in translators:
                 format_translators[fmt] = translators.pop(fmt)
 
-            if fmt in self.pattern_names:
-                subcls = self.pattern_names[fmt]
-                bitstring_chunks.append(subcls.fold_metadata['bitstring_format'])
+            if fmt in self.patterns:
+                subcls = self.patterns[fmt]
+                subcls_fmt = self.patterns[subcls]['bitstring_format']
+                bitstring_chunks.append(subcls_fmt)
                 fold_format.append((name, subcls))
             else:
                 bitstring_chunks.append(fmt)
@@ -42,33 +42,33 @@ class Crafter(object):
         bitstring_format = ','.join(bitstring_chunks)
         flat_count = len(bitstring_format.split(','))  # We have to do this after bitstring is joined because some
                                                        # pieces will be more than one piece (nested folding)
-        cls.fold_metadata = {
+        fold_metadata = {
             'bitstring_format': bitstring_format,
             'fold_format': fold_format,
             'flat_count': flat_count,
-            'crafter': self,
             'name_translators': name_translators,
             'format_translators': format_translators
-
         }
-        self.patterns.append(cls)
-        self.pattern_names[cls.__name__] = cls
+        self.patterns[cls] = fold_metadata
+        self.patterns[cls.__name__] = cls
+        if not getattr(cls, '_default_crafter', None):
+            cls._default_crafter = self
 
     def fold(self, obj):
         values = self._get_flat_values(obj)
-        fmt = obj.__class__.fold_metadata['bitstring_format']
+        fmt = self.patterns[obj.__class__]['bitstring_format']
         return bitstring.pack(fmt, *values)
 
     def unfold(self, cls_or_obj, data, seek=True):
         cls, instance = self._get_cls_obj(cls_or_obj)
-        fmt = cls.fold_metadata['bitstring_format']
+        fmt = self.patterns[cls]['bitstring_format']
         values = data.unpack(fmt)
         return self._obj_from_values(cls, instance, values, pos=0)
 
     def _get_flat_values(self, obj):
         values = []
 
-        meta = obj.__class__.fold_metadata
+        meta = self.patterns[obj.__class__]
         name_translators = meta['name_translators']
         format_translators = meta['format_translators']
 
@@ -91,7 +91,7 @@ class Crafter(object):
     def _obj_from_values(self, cls, instance, values, pos=0):
         kwargs = {}
 
-        meta = cls.fold_metadata
+        meta = self.patterns[cls]
         format = meta['fold_format']
         name_translators = meta['name_translators']
         format_translators = meta['format_translators']
@@ -106,20 +106,20 @@ class Crafter(object):
                 offset = 1
             elif fmt in self.patterns:
                 value = self._obj_from_values(fmt, None, values, pos=pos)
-                offset = fmt.fold_metadata['flat_count']
+                offset = self.patterns[fmt]['flat_count']
             kwargs[attr] = value
             pos += offset
-        return cls.unfold(instance, **kwargs)
+        return cls.unfold(self.name, instance, **kwargs)
 
     def _get_cls_obj(self, cls_or_obj):
         instance = None
 
-        #Class object
+        # Class or string
         if cls_or_obj in self.patterns:
-            cls = cls_or_obj
-        #Class string
-        elif cls_or_obj in self.pattern_names:
-            cls = self.pattern_names[cls_or_obj]
+            if isinstance(cls_or_obj, str):
+                cls = self.patterns[cls_or_obj]
+            else:
+                cls = cls_or_obj
         #Instance
         elif cls_or_obj.__class__ in self.patterns:
             cls = cls_or_obj.__class__
