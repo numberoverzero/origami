@@ -1,9 +1,12 @@
 from origami.util import multidelim_generator, validate_bitstring_format
+from origami.exceptions import (
+    InvalidPatternClassException,
+    InvalidFoldFormatException,
+    FoldingException,
+    UnfoldingException
+)
 import bitstring
 
-_MISSING_ATTR = "'{}' object was missing expected attribute '{}'"
-_UNKNOWN_FMT = "Ecountered unknown fold '{}' while learning pattern '{}'"
-_ALREADY_SEEN_PATTERN = "Crafter '{}' cannot learn pattern '{}': Already known"
 _crafters = {}
 
 
@@ -16,15 +19,18 @@ class Crafter(object):
         return _crafters[name]
 
     def learn_pattern(self, cls, unfold_func, folds, creases):
+        if not cls:
+            raise InvalidPatternClassException(cls, "Must be class object.")
         if cls.__name__ in self.patterns:
-            raise KeyError(_ALREADY_SEEN_PATTERN.format(self.name, cls))
-        else:
-            print self.patterns
+            raise InvalidPatternClassException(cls, "Crafter {} already learned it.".format(self.name))
         processed_folds, bitstring_chunks = [], []
 
         creases = creases or {}
         name_creases = {}
         format_creases = {}
+
+        if not folds:
+            raise InvalidFoldFormatException(folds, 'Nothing to fold!')
 
         for name, fmt in multidelim_generator(folds, ',', '='):
             if name in creases:
@@ -41,7 +47,7 @@ class Crafter(object):
                 bitstring_chunks.append(fmt)
                 processed_folds.append((name, fmt))
             else:
-                raise ValueError(_UNKNOWN_FMT.format(fmt, cls.__name__))
+                raise InvalidFoldFormatException(fmt, 'Not a known pattern or valid bitstring format.')
 
         bitstring_format = ','.join(bitstring_chunks)
         flat_count = len(bitstring_format.split(','))  # We have to do this after bitstring is joined because some
@@ -58,14 +64,25 @@ class Crafter(object):
         self.patterns[cls.__name__] = cls
 
     def fold(self, obj):
+        try:
+            fmt = self.patterns[obj.__class__]['bitstring_format']
+        except KeyError:
+            raise FoldingException(obj, "Unknown pattern class '{}'.".format(obj.__class__))
+
         values = self._get_flat_values(obj)
-        fmt = self.patterns[obj.__class__]['bitstring_format']
-        return bitstring.pack(fmt, *values)
+
+        try:
+            return bitstring.pack(fmt, *values)
+        except ValueError as e:
+            raise FoldingException(obj, e.message)
 
     def unfold(self, cls_or_obj, data, seek=True):
         cls, instance = self._get_cls_obj(cls_or_obj)
         fmt = self.patterns[cls]['bitstring_format']
-        values = data.unpack(fmt)
+        try:
+            values = data.unpack(fmt)
+        except bitstring.ReadError as e:
+            raise UnfoldingException(cls_or_obj, e.msg)
         return self._obj_from_values(cls, instance, values, pos=0)
 
     def _get_flat_values(self, obj):
@@ -79,7 +96,7 @@ class Crafter(object):
             try:
                 data = getattr(obj, attr)
             except AttributeError:
-                raise AttributeError(_MISSING_ATTR.format(obj.__class__.__name__, attr))
+                raise FoldingException(obj, "missing expected attribute '{}'".format(attr))
 
             if fmt in self.patterns:
                 values.extend(self._get_flat_values(data))
@@ -128,5 +145,5 @@ class Crafter(object):
             cls = cls_or_obj.__class__
             instance = cls_or_obj
         else:
-            raise ValueError("Don't know how to unfold {}".format(cls_or_obj))
+            raise UnfoldingException(cls_or_obj, "Unknown object or pattern class '{}'.".format(cls_or_obj))
         return cls, instance

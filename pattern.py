@@ -1,6 +1,5 @@
 from origami.crafter import Crafter
-
-_AUTO_MISSING_ATTR = "Built-in unfold method expected value for attribute '{}' but found none."
+from origami.exceptions import UnfoldingException
 
 
 def pattern(crafter='global', default=True, unfold=True):
@@ -16,12 +15,12 @@ def pattern(crafter='global', default=True, unfold=True):
                     try:
                         setattr(instance, attr, kwargs[attr])
                     except KeyError:
-                        raise AttributeError(_AUTO_MISSING_ATTR.format(attr))
+                        raise UnfoldingException(instance, "missing expected attribute '{}'".format(attr))
                 return instance
             cls.unfold = cls_unfold
 
         unfold_func = cls.unfold
-        folds = cls.origami_folds
+        folds = getattr(cls, 'origami_folds', '')
         creases = getattr(cls, 'origami_creases', {})
 
         c.learn_pattern(cls, unfold_func, folds, creases)
