@@ -2,7 +2,7 @@ from origami.crafter import Crafter
 from origami.exceptions import UnfoldingException
 
 
-def pattern(crafter='global', default=True, unfold=True):
+def pattern(crafter='global', unfold=True):
     def wrap_class(cls):
         c = Crafter(crafter)
 
@@ -22,11 +22,7 @@ def pattern(crafter='global', default=True, unfold=True):
         unfold_func = cls.unfold
         folds = getattr(cls, 'origami_folds', '')
         creases = getattr(cls, 'origami_creases', {})
-
         c.learn_pattern(cls, unfold_func, folds, creases)
-
-        if default:
-            cls._crafter = c
 
         return cls
     return wrap_class

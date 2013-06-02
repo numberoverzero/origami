@@ -6,6 +6,7 @@ from origami.exceptions import (
     UnfoldingException
 )
 import bitstring
+import collections
 
 _crafters = {}
 
@@ -31,12 +32,17 @@ class Crafter(object):
 
         if not folds:
             raise InvalidFoldFormatException(folds, 'Nothing to fold!')
+        if isinstance(folds, collections.Mapping):
+            try:
+                folds = folds[self.name]
+            except KeyError:
+                raise InvalidFoldFormatException(folds, "No folds found for Crafter with name '{}'".format(self.name))
 
         for name, fmt in multidelim_generator(folds, ',', '='):
             if name in creases:
-                name_creases[name] = creases.pop(name)
+                name_creases[name] = creases[name]
             if fmt in creases:
-                format_creases[fmt] = creases.pop(fmt)
+                format_creases[fmt] = creases[fmt]
 
             if fmt in self.patterns:
                 subcls = self.patterns[fmt]
@@ -73,6 +79,8 @@ class Crafter(object):
 
         try:
             return bitstring.pack(fmt, *values)
+        except bitstring.CreationError as e:
+            raise FoldingException(obj, str(e))
         except ValueError as e:
             raise FoldingException(obj, e.message)
 

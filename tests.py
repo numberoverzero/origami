@@ -6,6 +6,7 @@ from origami.exceptions import (
     UnfoldingException
 )
 
+import collections
 import bitstring
 import unittest
 import uuid
@@ -26,6 +27,19 @@ def equals(*attrs):
         except AttributeError:
             return False
     return eq
+
+
+def count_creases(fold, unfold):
+    counter = collections.defaultdict(int)
+
+    def fold_(value):
+        counter['fold'] += 1
+        return fold(value)
+
+    def unfold_(value):
+        counter['unfold'] += 1
+        return unfold(value)
+    return counter, {'fold': fold_, 'unfold': unfold_}
 
 
 unique_id = lambda: str(uuid.uuid4())
@@ -150,7 +164,6 @@ class CrafterTests(unittest.TestCase):
     def testUnfoldUnknownPattern(self):
         class Foo(object):
             pass
-        foo = Foo()
         with self.assertRaises(UnfoldingException):
             self.crafter.unfold(Foo, None)
 
@@ -206,8 +219,7 @@ class PatternTests(unittest.TestCase):
             origami_folds = 'a=uint:8'
 
         assert hasattr(Foo, 'unfold')
-        assert hasattr(Foo, '_crafter')
-        assert Foo._crafter is self.crafter
+        assert Foo in self.crafter.patterns
 
     def testPatternNoFolds(self):
         with self.assertRaises(InvalidFoldFormatException):
@@ -221,8 +233,8 @@ class PatternTests(unittest.TestCase):
             origami_folds = 'a=uint:8'
             pass
 
-        assert Foo._crafter is Crafter()
         assert hasattr(Foo, 'unfold')
+        assert Foo in Crafter('global').patterns
 
     def testGeneratedUnfoldMethod(self):
         @pattern(self.id)
@@ -250,26 +262,8 @@ class PatternTests(unittest.TestCase):
 
         assert foo is other_foo
 
-    def testMuliCrafterTopWinsDefault(self):
+    def testMultiCrafterUnfoldWorksForBoth(self):
         @pattern(self.id)
-        @pattern(self.other_id)
-        class Foo(object):
-            origami_folds = 'a=uint:8'
-            pass
-
-        assert Foo._crafter is Crafter(self.id)
-
-    def testMuliCrafterExplicitDefault(self):
-        @pattern(self.id, default=False)
-        @pattern(self.other_id)
-        class Foo(object):
-            origami_folds = 'a=uint:8'
-            pass
-
-        assert Foo._crafter is Crafter(self.other_id)
-
-    def testMultiCrafterDefaultUnfoldWorksForBoth(self):
-        @pattern(self.id, default=False)
         @pattern(self.other_id)
         class Foo(object):
             origami_folds = 'a=uint:8, b=uint:8'
@@ -297,3 +291,154 @@ class PatternTests(unittest.TestCase):
 
         with self.assertRaises(UnfoldingException):
             foo = Foo.unfold(self.id, foo, **kwargs)
+
+
+class FoldUnfoldTests(unittest.TestCase):
+    def setUp(self):
+        self.id = unique_id()
+        self.other_id = unique_id()
+        self.crafter = Crafter(self.id)
+
+    def testSingleCrafter(self):
+        @pattern(self.id)
+        class Foo(object):
+            origami_folds = 'a=uint:8, b=uint:1'
+            __init__ = init('a', 'b')
+            __eq__ = equals('a', 'b')
+
+        foo = Foo(129, 1)
+
+        data = fold(foo, crafter=self.id)
+        other_foo = unfold(Foo, data, crafter=self.id)
+
+        assert foo == other_foo
+
+    def testNameCrease(self):
+        counter, a_creases = count_creases(fold=int, unfold=str)
+
+        @pattern(self.id)
+        class Foo(object):
+            origami_folds = 'a=uint:8, b=uint:1'
+            origami_creases = {'a': a_creases}
+            __init__ = init('a', 'b')
+            __eq__ = equals('a', 'b')
+
+        foo = Foo('129', 1)
+
+        data = fold(foo, crafter=self.id)
+        other_foo = unfold(Foo, data, crafter=self.id)
+
+        assert foo == other_foo
+        assert counter['fold'] == counter['unfold'] == 1
+
+    def testFormatCrease(self):
+        counter, uint8_creases = count_creases(fold=int, unfold=str)
+
+        @pattern(self.id)
+        class Foo(object):
+            origami_folds = 'a=uint:8, b=uint:1'
+            origami_creases = {'uint:8': uint8_creases}
+            __init__ = init('a', 'b')
+            __eq__ = equals('a', 'b')
+
+        foo = Foo('129', 1)
+
+        data = fold(foo, crafter=self.id)
+        other_foo = unfold(Foo, data, crafter=self.id)
+
+        assert foo == other_foo
+        assert counter['fold'] == counter['unfold'] == 1
+
+    def testNameCreaseHasPriority(self):
+        name_counter, name_creases = count_creases(fold=int, unfold=str)
+        fmt_counter, fmt_creases = count_creases(fold=int, unfold=str)
+
+        @pattern(self.id)
+        class Foo(object):
+            origami_folds = 'a=uint:8, b=uint:1'
+            origami_creases = {'a': name_creases, 'uint:8': fmt_creases}
+            __init__ = init('a', 'b')
+            __eq__ = equals('a', 'b')
+
+        foo = Foo('129', 1)
+
+        data = fold(foo, crafter=self.id)
+        other_foo = unfold(Foo, data, crafter=self.id)
+
+        assert foo == other_foo
+        assert name_counter['fold'] == name_counter['unfold'] == 1
+        assert fmt_counter['fold'] == fmt_counter['unfold'] == 0
+
+    def testMultipleCraftersSameFolds(self):
+        @pattern(self.id)
+        @pattern(self.other_id)
+        class Foo(object):
+            origami_folds = 'a=uint:8, b=uint:1'
+            __init__ = init('a', 'b')
+            __eq__ = equals('a', 'b')
+
+        original_foo = Foo(129, 1)
+
+        data = fold(original_foo, crafter=self.id)
+        other_data = fold(original_foo, crafter=self.other_id)
+
+        foo = unfold(Foo, data, crafter=self.id)
+        other_foo = unfold(Foo, other_data, crafter=self.other_id)
+
+        assert original_foo == foo
+        assert foo == other_foo
+
+    def testMultipleCraftersDifferentFolds(self):
+        @pattern(self.id)
+        @pattern(self.other_id)
+        class Foo(object):
+            origami_folds = {
+                self.id: 'a=uint:8, b=uint:1',
+                self.other_id: 'b=uint:1, c=uint:7'
+            }
+            __init__ = init(*list('abc'))
+            __eq__ = equals(*list('abc'))
+
+        original_foo = Foo(129, 1, 100)
+
+        data = fold(original_foo, crafter=self.id)
+        other_data = fold(original_foo, crafter=self.other_id)
+
+        foo = unfold(Foo, data, crafter=self.id)
+        other_foo = unfold(Foo, other_data, crafter=self.other_id)
+
+        assert foo.a == original_foo.a
+        assert foo.b == original_foo.b
+
+        assert other_foo.b == original_foo.b
+        assert other_foo.c == original_foo.c
+
+    def testMultipleCraftersUseSameCreases(self):
+        counter, b_creases = count_creases(fold=int, unfold=str)
+
+        @pattern(self.other_id)
+        @pattern(self.id)
+        class Foo(object):
+            origami_folds = {
+                self.id: 'a=uint:8, b=uint:4',
+                self.other_id: 'b=uint:4, c=uint:7'
+            }
+            origami_creases = {'b': b_creases}
+            __init__ = init(*list('abc'))
+            __eq__ = equals(*list('abc'))
+
+        original_foo = Foo(129, '12', 100)
+
+        data = fold(original_foo, crafter=self.id)
+        other_data = fold(original_foo, crafter=self.other_id)
+
+        foo = unfold(Foo, data, crafter=self.id)
+        other_foo = unfold(Foo, other_data, crafter=self.other_id)
+
+        assert foo.a == original_foo.a
+        assert foo.b == original_foo.b
+
+        assert other_foo.b == original_foo.b
+        assert other_foo.c == original_foo.c
+
+        assert counter['fold'] == counter['unfold'] == 2
