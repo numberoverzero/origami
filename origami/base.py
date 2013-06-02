@@ -1,4 +1,4 @@
-from crafter import Crafter
+from origami.crafter import Crafter
 
 
 def fold(obj, crafter='global'):
