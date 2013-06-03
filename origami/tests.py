@@ -143,6 +143,19 @@ class CrafterTests(unittest.TestCase):
         with self.assertRaises(FoldingException):
             self.crafter.fold(foo)
 
+    def testFoldOutOfRangeValue(self):
+        class Foo(object):
+            pass
+        cls = Foo
+        unfold_func = lambda: None
+        folds = 'a=uint:8'
+        creases = {}
+        self.crafter.learn_pattern(cls, unfold_func, folds, creases)
+        foo = Foo()
+        foo.a = 1 << 20
+        with self.assertRaises(FoldingException):
+            self.crafter.fold(foo)
+
     def testUnfoldPattern(self):
         class Foo(object):
             pass

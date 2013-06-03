@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='Origami',
-    version='0.0.2',
+    version='0.0.3',
     author='Joe Cross',
     author_email='joe.mcross@gmail.com',
     packages=['origami'],

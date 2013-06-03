@@ -82,7 +82,10 @@ class Crafter(object):
         except bitstring.CreationError as e:
             raise FoldingException(obj, str(e))
         except ValueError as e:
-            raise FoldingException(obj, e.message)
+            if hasattr(e, 'message'):
+                raise FoldingException(obj, e.message)
+            else:
+                raise FoldingException(obj, str(e))
 
     def unfold(self, cls_or_obj, data, seek=True):
         cls, instance = self._get_cls_obj(cls_or_obj)
