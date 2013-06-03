@@ -88,8 +88,8 @@ And to use them::
     copy_action = unfold(Action, data)
 
     print(
-        copy_action.copy_print.x,
-        copy_action.copy_print.y,
+        copy_action.point.x,
+        copy_action.point.y,
         copy_action.undo
     )
 
