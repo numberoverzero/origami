@@ -10,7 +10,10 @@ def pattern(crafter='global', unfold=True):
             @classmethod
             def cls_unfold(cls, name, instance, **kwargs):
                 if instance is None:
-                    instance = cls()
+                    try:
+                        instance = cls()
+                    except TypeError:
+                        raise UnfoldingException(cls, '__init__ method has 1 or more requires arguments')
                 for attr, fmt in Crafter(name).patterns[cls]['folds']:
                     try:
                         setattr(instance, attr, kwargs[attr])

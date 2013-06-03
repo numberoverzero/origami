@@ -234,6 +234,35 @@ class PatternTests(unittest.TestCase):
         assert hasattr(Foo, 'unfold')
         assert Foo in self.crafter.patterns
 
+    def testPatternWithSlots(self):
+        @pattern(self.id)
+        class Foo(object):
+            __slots__ = ['a']
+            origami_folds = 'a=uint:8'
+
+            def __init__(self, a=10):
+                self.a = a
+            __eq__ = equals('a')
+
+        foo = Foo(120)
+        data = fold(foo, crafter=self.id)
+        other_foo = unfold(Foo, data, crafter=self.id)
+
+        assert foo == other_foo
+
+    def testPatternInvalidInit(self):
+        @pattern(self.id)
+        class Foo(object):
+            origami_folds = 'a=uint:8'
+
+            def __init__(self, a):
+                self.a = a
+
+        foo = Foo(10)
+        data = fold(foo, crafter=self.id)
+        with self.assertRaises(UnfoldingException):
+            unfold(Foo, data, crafter=self.id)
+
     def testPatternNoFolds(self):
         with self.assertRaises(InvalidFoldFormatException):
             @pattern(self.id)
@@ -351,6 +380,25 @@ class FoldUnfoldTests(unittest.TestCase):
         class Foo(object):
             origami_folds = 'a=uint:8, b=uint:1'
             origami_creases = {'uint:8': uint8_creases}
+            __init__ = init('a', 'b')
+            __eq__ = equals('a', 'b')
+
+        foo = Foo('129', 1)
+
+        data = fold(foo, crafter=self.id)
+        other_foo = unfold(Foo, data, crafter=self.id)
+
+        assert foo == other_foo
+        assert counter['fold'] == counter['unfold'] == 1
+
+    def testFormatCreaseWithCustomFmt(self):
+        counter, my_int_creases = count_creases(fold=int, unfold=str)
+        my_int_creases['fmt'] = 'uint:8'
+
+        @pattern(self.id)
+        class Foo(object):
+            origami_folds = 'a=my_int, b=uint:1'
+            origami_creases = {'my_int': my_int_creases}
             __init__ = init('a', 'b')
             __eq__ = equals('a', 'b')
 

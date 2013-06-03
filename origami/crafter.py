@@ -52,6 +52,19 @@ class Crafter(object):
             elif validate_bitstring_format(fmt):
                 bitstring_chunks.append(fmt)
                 processed_folds.append((name, fmt))
+            elif fmt in format_creases:
+                # This crease must have a 'fmt' key that defines a valid bitstring format.
+                # This cannot refer to learned patterns because only one value is passed to the crease's fold/unfold
+                # methods, and that wouldn't make since for a pattern with (potentially) more than one bitstring value.
+                # Put the crease value for 'fmt' in the bitstring_chunks instead of the literal fmt string.
+                try:
+                    real_fmt = format_creases[fmt]['fmt']
+                except KeyError:
+                    raise InvalidFoldFormatException(fmt, "Custom creases require a valid bistring format under the key 'fmt'.")
+                if not validate_bitstring_format(real_fmt):
+                    raise InvalidFoldFormatException(real_fmt, 'Custom creases fmt not a known pattern or valid bitstring format.')
+                bitstring_chunks.append(real_fmt)
+                processed_folds.append((name, fmt))
             else:
                 raise InvalidFoldFormatException(fmt, 'Not a known pattern or valid bitstring format.')
 
