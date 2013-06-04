@@ -229,7 +229,7 @@ class PatternTests(unittest.TestCase):
     def testPattern(self):
         @pattern(self.id)
         class Foo(object):
-            origami_folds = 'a=uint:8'
+            _folds = 'a=uint:8'
 
         assert hasattr(Foo, 'unfold')
         assert Foo in self.crafter.patterns
@@ -238,7 +238,7 @@ class PatternTests(unittest.TestCase):
         @pattern(self.id)
         class Foo(object):
             __slots__ = ['a']
-            origami_folds = 'a=uint:8'
+            _folds = 'a=uint:8'
 
             def __init__(self, a=10):
                 self.a = a
@@ -253,7 +253,7 @@ class PatternTests(unittest.TestCase):
     def testPatternInvalidInit(self):
         @pattern(self.id)
         class Foo(object):
-            origami_folds = 'a=uint:8'
+            _folds = 'a=uint:8'
 
             def __init__(self, a):
                 self.a = a
@@ -272,7 +272,7 @@ class PatternTests(unittest.TestCase):
     def testPatternGlobalCrafter(self):
         @pattern()
         class Foo(object):
-            origami_folds = 'a=uint:8'
+            _folds = 'a=uint:8'
             pass
 
         assert hasattr(Foo, 'unfold')
@@ -281,7 +281,7 @@ class PatternTests(unittest.TestCase):
     def testGeneratedUnfoldMethod(self):
         @pattern(self.id)
         class Foo(object):
-            origami_folds = 'a=uint:8, b=uint:8'
+            _folds = 'a=uint:8, b=uint:8'
             __init__ = init('a', 'b')
             __eq__ = equals('a', 'b')
 
@@ -294,7 +294,7 @@ class PatternTests(unittest.TestCase):
     def testGeneratedUnfoldReturnsInstance(self):
         @pattern(self.id)
         class Foo(object):
-            origami_folds = 'a=uint:8, b=uint:8'
+            _folds = 'a=uint:8, b=uint:8'
             __init__ = init('a', 'b')
             __eq__ = equals('a', 'b')
 
@@ -308,7 +308,7 @@ class PatternTests(unittest.TestCase):
         @pattern(self.id)
         @pattern(self.other_id)
         class Foo(object):
-            origami_folds = 'a=uint:8, b=uint:8'
+            _folds = 'a=uint:8, b=uint:8'
             __init__ = init('a', 'b')
             __eq__ = equals('a', 'b')
 
@@ -324,7 +324,7 @@ class PatternTests(unittest.TestCase):
     def testPatternUnfoldMissingAttr(self):
         @pattern(self.id)
         class Foo(object):
-            origami_folds = 'a=uint:8, b=uint:8'
+            _folds = 'a=uint:8, b=uint:8'
             __init__ = init('a', 'b')
             __eq__ = equals('a', 'b')
 
@@ -344,7 +344,7 @@ class FoldUnfoldTests(unittest.TestCase):
     def testSingleCrafter(self):
         @pattern(self.id)
         class Foo(object):
-            origami_folds = 'a=uint:8, b=uint:1'
+            _folds = 'a=uint:8, b=uint:1'
             __init__ = init('a', 'b')
             __eq__ = equals('a', 'b')
 
@@ -360,8 +360,8 @@ class FoldUnfoldTests(unittest.TestCase):
 
         @pattern(self.id)
         class Foo(object):
-            origami_folds = 'a=uint:8, b=uint:1'
-            origami_creases = {'a': a_creases}
+            _folds = 'a=uint:8, b=uint:1'
+            _creases = {'a': a_creases}
             __init__ = init('a', 'b')
             __eq__ = equals('a', 'b')
 
@@ -378,8 +378,8 @@ class FoldUnfoldTests(unittest.TestCase):
 
         @pattern(self.id)
         class Foo(object):
-            origami_folds = 'a=uint:8, b=uint:1'
-            origami_creases = {'uint:8': uint8_creases}
+            _folds = 'a=uint:8, b=uint:1'
+            _creases = {'uint:8': uint8_creases}
             __init__ = init('a', 'b')
             __eq__ = equals('a', 'b')
 
@@ -397,8 +397,8 @@ class FoldUnfoldTests(unittest.TestCase):
 
         @pattern(self.id)
         class Foo(object):
-            origami_folds = 'a=my_int, b=uint:1'
-            origami_creases = {'my_int': my_int_creases}
+            _folds = 'a=my_int, b=uint:1'
+            _creases = {'my_int': my_int_creases}
             __init__ = init('a', 'b')
             __eq__ = equals('a', 'b')
 
@@ -416,8 +416,8 @@ class FoldUnfoldTests(unittest.TestCase):
 
         @pattern(self.id)
         class Foo(object):
-            origami_folds = 'a=uint:8, b=uint:1'
-            origami_creases = {'a': name_creases, 'uint:8': fmt_creases}
+            _folds = 'a=uint:8, b=uint:1'
+            _creases = {'a': name_creases, 'uint:8': fmt_creases}
             __init__ = init('a', 'b')
             __eq__ = equals('a', 'b')
 
@@ -434,7 +434,7 @@ class FoldUnfoldTests(unittest.TestCase):
         @pattern(self.id)
         @pattern(self.other_id)
         class Foo(object):
-            origami_folds = 'a=uint:8, b=uint:1'
+            _folds = 'a=uint:8, b=uint:1'
             __init__ = init('a', 'b')
             __eq__ = equals('a', 'b')
 
@@ -453,7 +453,7 @@ class FoldUnfoldTests(unittest.TestCase):
         @pattern(self.id)
         @pattern(self.other_id)
         class Foo(object):
-            origami_folds = {
+            _folds = {
                 self.id: 'a=uint:8, b=uint:1',
                 self.other_id: 'b=uint:1, c=uint:7'
             }
@@ -480,11 +480,11 @@ class FoldUnfoldTests(unittest.TestCase):
         @pattern(self.other_id)
         @pattern(self.id)
         class Foo(object):
-            origami_folds = {
+            _folds = {
                 self.id: 'a=uint:8, b=uint:4',
                 self.other_id: 'b=uint:4, c=uint:7'
             }
-            origami_creases = {'b': b_creases}
+            _creases = {'b': b_creases}
             __init__ = init(*list('abc'))
             __eq__ = equals(*list('abc'))
 

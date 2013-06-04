@@ -64,7 +64,7 @@ Our code is set up in such a way that coordinate values are always between [0, 5
 
     @pattern()
     class Point(object):
-        origami_folds = 'x=uint:9, y=uint:9'
+        _folds = 'x=uint:9, y=uint:9'
         __slots__ = ['x', 'y']
         def __init__(self, x=0, y=0):
             self.x = x
@@ -72,7 +72,7 @@ Our code is set up in such a way that coordinate values are always between [0, 5
 
     @pattern()
     class Action(object):
-        origami_folds = 'point=Point, undo=bool'
+        _folds = 'point=Point, undo=bool'
         def __init__(self, point=None, is_undo=False):
             self.point = point
             self.undo = is_undo
@@ -93,7 +93,7 @@ And to use them::
         copy_action.undo
     )
 
-The ``@pattern`` decorator does most of the lifting here, specifying a ``Crafter`` and hooking up the important fields for folding.  ``origami_folds`` describes which attributes to fold, and how to fold them.  ``uint:{n}`` and ``bool`` are built-in bitstring formats, while ``Point`` refers to the recently learned pattern for the Point class.  Note that to use the generated ``unfold`` method from the pattern decorator, the class must support an ``__init__`` method that takes no arguments.
+The ``@pattern`` decorator does most of the lifting here, specifying a ``Crafter`` and hooking up the important fields for folding.  ``_folds`` describes which attributes to fold, and how to fold them.  ``uint:{n}`` and ``bool`` are built-in bitstring formats, while ``Point`` refers to the recently learned pattern for the Point class.  Note that to use the generated ``unfold`` method from the pattern decorator, the class must support an ``__init__`` method that takes no arguments.
 
 **NOTE:**
  ``unfold`` can take as its first argument either a learned class or an instance of a learned class.  When the class is passed ``unfold(Action, data)`` a new instance is created and returned.  When an instance is passed ``unfold(some_action, data)``, the foldable attributes are unfolded into that object directly and the same object is returned.  This can be useful when creating an instance of the object requires additional setup (such as connecting to a database, or secure credentials that can't be folded).
@@ -108,7 +108,7 @@ Imagine the ``Block`` class for a Minecraft clone, where instances sometimes hav
     @pattern('client')
     @pattern('disk')
     class Block(object):
-        origami_folds = {
+        _folds = {
             'client': 'x=uint:32, y=uint:32, type=uint:8',
             'disk':   'x=uint:32, y=uint:32, type=uint:8, bonus=bool'
         }
@@ -142,7 +142,7 @@ By default, the ``@pattern`` decorator will generate an ``unfold`` method for th
 
     @pattern()
     class Foo(object):
-        origami_folds = 'alive=bool'
+        _folds = 'alive=bool'
         def __init__(self, alive):
             self.alive = alive
 
@@ -151,7 +151,7 @@ In this case, we can tell pattern that we'd like to provide our own ``unfold`` m
 
     @pattern(unfold=False)
     class Foo(object):
-        origami_folds = 'alive=bool'
+        _folds = 'alive=bool'
         def __init__(self, alive):
             self.alive = alive
 
@@ -186,8 +186,8 @@ Sometimes the bitstring format strings *(such as* ``uint:8`` *)* aren't enough t
 
     @pattern()
     class Block(object):
-        origami_folds = 'enabled=bool, type=block-type'
-        origami_creases = {
+        _folds = 'enabled=bool, type=block-type'
+        _creases = {
             'block-type': {'fmt': 'uint:2', 'fold': fold_type, 'unfold': unfold_type}
         }
         def  __init__(self, enabled=True, type='Grass'):
@@ -198,7 +198,7 @@ Now when we fold a Block, it will use the bitstring format ``bool`` for the enab
 
 We can also specify **name creases** which are creases that only act on attributes with a matching name.  To achieve the same thing as we have above using a name crease, we would pass::
 
-        origami_creases = {
+        _creases = {
             'type': {'fmt': 'uint:2', 'fold': fold_type, 'unfold': unfold_type}
         }
 
@@ -227,7 +227,7 @@ Here's a class using the pattern decorator::
 
     @pattern()
     class Point(object):
-        origami_folds = 'x=uint:9, y=uint:9'
+        _folds = 'x=uint:9, y=uint:9'
         __slots__ = ['x', 'y']
         def __init__(self, x=0, y=0):
             self.x = x

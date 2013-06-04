@@ -23,8 +23,8 @@ def pattern(crafter='global', unfold=True):
             cls.unfold = cls_unfold
 
         unfold_func = cls.unfold
-        folds = getattr(cls, 'origami_folds', '')
-        creases = getattr(cls, 'origami_creases', {})
+        folds = getattr(cls, '_folds', '')
+        creases = getattr(cls, '_creases', {})
         c.learn_pattern(cls, unfold_func, folds, creases)
 
         return cls
