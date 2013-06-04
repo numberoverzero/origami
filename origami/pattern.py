@@ -3,6 +3,19 @@ from origami.exceptions import UnfoldingException
 
 
 def pattern(crafter='global', unfold=True):
+    '''
+    Class decorator that handles most of the pattern learning machinery for a class.
+
+    The decorated class should have the attribute _folds, and optionally _creases.
+
+    crafter is a string indicating which crafter the class will be learned by, and defaults to 'global'
+
+    If unfold is True, creates an "unfold" function on the class that constructs instances of the class from data
+    unfolded by the Crafter.  The attributes that will be set are pulled from the class's _folds string.
+
+    If the class's _folds attribute is a dictionary, uses the string found at _folds[creator].
+    Passes _creases to the Crafter if defined, otherwise an empty dictionary.
+    '''
     def wrap_class(cls):
         c = Crafter(crafter)
 

@@ -12,7 +12,13 @@ _crafters = {}
 
 
 class Crafter(object):
+    '''
+    Used for folding and unfolding patterns.
+    '''
     def __new__(cls, name='global'):
+        '''
+        Crafters are uniquely identified by their name.
+        '''
         if name not in _crafters:
             c = _crafters[name] = super(Crafter, cls).__new__(cls)
             c.name = name
@@ -20,6 +26,35 @@ class Crafter(object):
         return _crafters[name]
 
     def learn_pattern(self, cls, unfold_func, folds, creases):
+        '''
+        cls - The class to learn
+        unfold_func - A function that takes (crafter_name, instance, **kwargs) where crafter name is a string
+            of the Crafter unfolding the object, instance is an instance of the cls or None, and kwargs is a dictioanry
+            where each key corresponds to the same key in folds.
+        folds - string of formats to fold attributes of an instance with.  If this is a dictionary, its keys should be
+            Crafter names, and the corresponding value a fold string.  If there is no key for the name of the Crafter
+            that is learning the pattern, raises InvalidFoldFormatException.
+        creases - creases is an optional dictionary whose keys are a mix of fold keys and fold formats.  If the key
+            is a fold format, it may be a literal bitstring format, or a custom format that maps to a bitstring format.
+            Each value should be a dictionary containing functinos for the keys 'fold' and 'unfold'.  These functions
+            should take a single argument and return a single argument.  They will be called during folding and
+            unfolding respectively, when getting or setting the particular attr on the instance of cls.  If the crease
+            is a custom format that maps to a bitstring format, it must provide an additional key 'fmt' which is a valid
+            bitstring format to use in place of the the literal key.  Name creases will always be used instead of format
+            creases when both apply to a particular name, format fold pair.
+
+            Example creases:
+
+            # Used on a format, such as 'enabled=bool'
+            # Doesn't need 'fmt' because bool is a bitstring format
+            creases = {'bool': {'fold': my_bool_fold_func, 'unfold': my_bool_unfold_func}}
+
+            # Used on a key, as in 'my_attr=uint:8'
+            creases = {'my_attr': {'fold': fold_attr_func, 'unfold': unfold_attr_func}}
+
+            #Custom format, as in 'enabled=my_bool'
+            creases = {'bool': {'fmt': bool, fold': my_bool_fold_func, 'unfold': my_bool_unfold_func}}
+        '''
         if not cls:
             raise InvalidPatternClassException(cls, "Must be class object.")
         if cls.__name__ in self.patterns:
@@ -83,6 +118,7 @@ class Crafter(object):
         self.patterns[cls.__name__] = cls
 
     def fold(self, obj):
+        '''Fold the object into a BitString according to its pattern's folds and creases.'''
         try:
             fmt = self.patterns[obj.__class__]['bitstring_format']
         except KeyError:
@@ -101,6 +137,7 @@ class Crafter(object):
                 raise FoldingException(obj, str(e))
 
     def unfold(self, cls_or_obj, data, seek=True):
+        '''Unfold the object (or return a new instance) from a BitString according to its pattern's folds and creases.'''
         cls, instance = self._get_cls_obj(cls_or_obj)
         fmt = self.patterns[cls]['bitstring_format']
         try:
