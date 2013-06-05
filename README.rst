@@ -41,7 +41,7 @@ Origami is tested against 2.7.3 and 3.3.0 with nose::
 Basic Usage
 =========================================
 
-Let's say we've created the following classes::
+Let's say we've created the following classes for our collaborative editing tool::
 
     class Point(object):
         __slots__ = ['x', 'y']
@@ -58,7 +58,7 @@ Let's say we've created the following classes::
         def undo(self):
             pass
 
-Our code is set up in such a way that coordinate values are always between [0, 511].  Let's add folding so we can send these over TCP as packets::
+Our code is set up in such a way that coordinate values are always between [0, 511].  We're using TCP to sync actions, so let's add some folding::
 
     from origami import pattern, fold, unfold
 
@@ -81,17 +81,19 @@ And to use them::
 
     point = Point(10, 20)
     action = Action(point, True)
-    data = fold(action)
+    action_data = fold(action)
 
-    print(data.bytes)
+    print(action_data.bytes)
 
-    copy_action = unfold(Action, data)
+    copy_action = unfold(Action, action_data)
 
     print(
         copy_action.point.x,
         copy_action.point.y,
         copy_action.undo
     )
+
+    server.send_action(action_data)
 
 The ``@pattern`` decorator does most of the lifting here, specifying a ``Crafter`` and hooking up the important fields for folding.  ``_folds`` describes which attributes to fold, and how to fold them.  ``uint:{n}`` and ``bool`` are built-in bitstring formats, while ``Point`` refers to the recently learned pattern for the Point class.  Note that to use the generated ``unfold`` method from the pattern decorator, the class must support an ``__init__`` method that takes no arguments.
 
