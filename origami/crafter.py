@@ -136,12 +136,12 @@ class Crafter(object):
             else:
                 raise FoldingException(obj, str(e))
 
-    def unfold(self, cls_or_obj, data, seek=True):
+    def unfold(self, cls_or_obj, data):
         '''Unfold the object (or return a new instance) from a BitString according to its pattern's folds and creases.'''
         cls, instance = self._get_cls_obj(cls_or_obj)
         fmt = self.patterns[cls]['bitstring_format']
         try:
-            values = data.unpack(fmt)
+            values = data.readlist(fmt)
         except bitstring.ReadError as e:
             raise UnfoldingException(cls_or_obj, e.msg)
         return self._obj_from_values(cls, instance, values, pos=0)

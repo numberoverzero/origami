@@ -219,6 +219,33 @@ class CrafterTests(unittest.TestCase):
         assert foo.a == a
         assert foo.b != b
 
+    def testUnfoldConcatenatedValues(self):
+        class Foo(object):
+            pass
+        cls = Foo
+
+        def unfold_func(name, instance, **kw):
+            instance = instance or Foo()
+            instance.a = kw['a']
+            instance.b = kw['b']
+            return instance
+        folds = 'a=uint:8, b=uint:8'
+        creases = {}
+        self.crafter.learn_pattern(cls, unfold_func, folds, creases)
+
+        a, b = 120, 254
+        other_a, other_b = 121, 255
+        data = bitstring.pack('uint:8, uint:8', a, b)
+        data += bitstring.pack('uint:8, uint:8', other_a, other_b)
+
+        foo = self.crafter.unfold(Foo, data)
+        other_foo = self.crafter.unfold(Foo, data)
+
+        assert foo.a == a
+        assert foo.b == b
+        assert other_foo.a == other_a
+        assert other_foo.b == other_b
+
 
 class PatternTests(unittest.TestCase):
     def setUp(self):
