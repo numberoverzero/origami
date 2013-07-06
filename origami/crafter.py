@@ -29,7 +29,7 @@ class Crafter(object):
         '''
         cls - The class to learn
         unfold_func - A function that takes (crafter_name, instance, **kwargs) where crafter name is a string
-            of the Crafter unfolding the object, instance is an instance of the cls or None, and kwargs is a dictioanry
+            of the Crafter unfolding the object, instance is an instance of the cls or None, and kwargs is a dictionary
             where each key corresponds to the same key in folds.
         folds - string of formats to fold attributes of an instance with.  If this is a dictionary, its keys should be
             Crafter names, and the corresponding value a fold string.  If there is no key for the name of the Crafter

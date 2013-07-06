@@ -1,6 +1,8 @@
 Origami
 ========================================================
 
+*(Tested against 2.7.3 and 3.3)*
+
 Origami is a lightweight package to help you serialize (or **fold**) objects into a binary format.
 
 Features:
@@ -23,45 +25,12 @@ Features:
 
 *   **Flexible, accessible configuration** - If you want to hand-craft an unfold method, that's fine too.  For more direct control, you can work directly with a Crafter (useful for dynamic code loading/generation)
 
-Why not just use ``Pickle``?
+Installation
 ========================================================
-As always, the answer is "it depends".  Origami is not for everyone (consult your doctor, etc etc).  Origami's primary advantage over pickle is the packed data's size, and the ability to selectively pack attributes without writing repetitive ``__getstate__`` and ``__setstate__`` functions.
 
-Pickle has the following advantages over origami:
-
-* **Simplicity** - While origami aims to have low overhead, it doesn't get much lower than pickle's zero.  For the set of values which origami covers, pickle requires no additional code beyond what you'd normally write for your class.
-
-* **Built-in module** - Pickle comes with python.  Origami currently depends on bitstring.
-
-* **Pickle ALL the things** - Pickle can pack any python class, and handles recursive objects and object sharing like a champ.  Origami supports a small subset of data types, and handles neither recursion or sharing.
-
-Origami has the following advantages over pickle:
-
-* **Size** - Origami offers serious space savings over pickle for basic objects.  See Appendix A for a comparison.
-
-* **Consise partial attribute folding** - Origami offers the ability to fold select attributes, when all values aren't needed/ shouldn't be distributed.  This is also possible with pickle by defining ``___getstate__`` and ``__setstate__`` functions, but this feels a bit heavy-weight compared to origami's fold strings (see Multiple patterns below).
-
-* **Multi-format folding** - Related to the previous, origami allows the same class to be folded differently for different consumers.
-
-* **Python-independent format** - Origami (more directly, the underlying use of bitstring) does not depend on python-specific behavior for (un)folding values.
-
-
-
-
-Installation and Tests
-========================================================
-Installing with pip is easy::
+::
 
     pip install origami
-
-Origami is tested against 2.7.3 and 3.3.0 with nose::
-
-    origami$ pip install nose
-    origami$ nosetests
-    ............................
-    ----------------------------------------------------------------------
-    Ran 31 tests in 0.008s
-    OK
 
 Basic Usage
 ========================================================
@@ -125,6 +94,32 @@ The ``@pattern`` decorator does most of the lifting here, specifying a ``Crafter
 **NOTE:**
  ``unfold`` can take as its first argument either a learned class or an instance of a learned class.  When the class is passed ``unfold(Action, data)`` a new instance is created and returned.  When an instance is passed ``unfold(some_action, data)``, the foldable attributes are unfolded into that object directly and the same object is returned.  This can be useful when creating an instance of the object requires additional setup (such as connecting to a database, or secure credentials that can't be folded).
 
+What data types are supported?
+========================================================
+Origami uses bitstring under the hood, so any format must eventually reduce to one bitstring understands (`formats <http://pythonhosted.org/bitstring/creation.html#using-the-constructor>`_).  See `Nesting`_ for building more complex structures.
+
+Why not just use ``Pickle``?
+========================================================
+As always, the answer is "it depends".  Origami is not for everyone (consult your doctor, etc etc).  Origami's primary advantage over pickle is the packed data's size, and the ability to selectively pack attributes without writing repetitive ``__getstate__`` and ``__setstate__`` functions.
+
+Pickle has the following advantages over origami:
+
+* **Simplicity** - While origami aims to have low overhead, it doesn't get much lower than pickle's zero.  For the set of values which origami covers, pickle requires no additional code beyond what you'd normally write for your class.
+
+* **Built-in module** - Pickle comes with python.  Origami currently depends on bitstring.
+
+* **Pickle ALL the things** - Pickle can pack any python class, and handles recursive objects and object sharing like a champ.  Origami supports a small subset of data types, and handles neither recursion or sharing.
+
+Origami has the following advantages over pickle:
+
+* **Size** - Origami offers serious space savings over pickle for basic objects.  See Appendix A for a comparison.
+
+* **Consise partial attribute folding** - Origami offers the ability to fold select attributes, when all values aren't needed/ shouldn't be distributed.  This is also possible with pickle by defining ``___getstate__`` and ``__setstate__`` functions, but this feels a bit heavy-weight compared to origami's fold strings (see `Multiple patterns`_)
+
+* **Multi-format folding** - Related to the previous, origami allows the same class to be folded differently for different consumers.
+
+* **Python-independent format** - Origami (more directly, the underlying use of bitstring) does not depend on python-specific behavior for (un)folding values.
+
 Multiple patterns
 ========================================================
 
@@ -162,10 +157,35 @@ Imagine the ``Block`` class for a Minecraft clone, where instances sometimes hav
 
 Like pattern, ``fold`` and ``unfold`` take the optional argument ``crafter`` and default to `global`.
 
+Nesting
+========================================================
+
+Origami's nesting allows complex structures to be built on top of the primitives that bitstring understands.
+::
+
+    from origami import pattern
+
+    @pattern()
+    class Color(object):
+        _folds = 'r=ch, g=ch, b=ch, a=ch'
+        _creases = {'ch': 'uint:8'}
+        def __init__(self, r=0, g=0, b=0, a=0):
+            # Set self.[rgba]
+
+Now, we can (un)fold an arbitrary palette without needing to remember how each color is (un)folded::
+
+    @pattern()
+    class Palette(object):
+        _folds = 'primary=Color, secondary=Color'
+        def __init__(self, primary=None, secondary=None):
+            # Set self.[primary, secondary]
+
+See `Creases`_ for an explanation of ``_creases = {'ch': 'uint:8'}``.
+
 Custom ``Unfold`` method
 ========================================================
 
-By default, the ``@pattern`` decorator will generate an ``unfold`` method for the class.  To work properly, this function requires the class to support an empty constructor.  The following class will not work::
+By default, the ``@pattern`` decorator will generate an ``unfold`` method for the class.  To work properly, this function expects the class to support an empty constructor.  The following class will not work::
 
     @pattern()
     class Foo(object):
@@ -189,6 +209,8 @@ In this case, we can tell pattern that we'd like to provide our own ``unfold`` m
                 setattr(instance, attr, value)
             return instance
 
+Where:
+
 *   ``crafter_name`` is the name of the crafter that is unfolding the object
 
 *   ``instance`` can be an instance of the class, or None
@@ -200,7 +222,7 @@ In this case, we can tell pattern that we'd like to provide our own ``unfold`` m
 Creases
 ========================================================
 
-Sometimes the bitstring format strings *(such as* ``uint:8`` *)* aren't enough to cover the types of data to fold.  Or, there may be some intermediate action to take whenever an attribute is folded.  Consider::
+Sometimes the bitstring format strings *(such as uint:8)* aren't enough to cover the types of data to fold.  Or, there may be some intermediate action to take whenever an attribute is folded.  Consider::
 
     block_types = ['Grass', 'Wood', 'Stone', 'Diamond']
 
@@ -297,7 +319,7 @@ Origami (2 bytes)::
 
     @pattern()
     class Point(object):
-        folds = 'x=uint:8, y=uint:8'
+        _folds = 'x=uint:8, y=uint:8'
         def __init__(self, x=0, y=0):
             self.x, self.y = x, y
 
