@@ -25,6 +25,9 @@ class Crafter(object):
             c.patterns = {}
         return _crafters[name]
 
+    def __repr__(self, *args, **kwargs):
+        return "Crafter('{}')".format(self.name)
+
     def learn_pattern(self, cls, unfold_func, folds, creases):
         '''
         cls - The class to learn

@@ -9,6 +9,7 @@ from origami.exceptions import (
 import collections
 import bitstring
 import unittest
+import pytest
 import uuid
 
 
@@ -54,6 +55,10 @@ class CrafterTests(unittest.TestCase):
         assert Crafter().name == 'global'
         assert Crafter() is Crafter('global')
 
+    def testRepr(self):
+        expected = "Crafter('{}')".format(self.id)
+        assert repr(self.crafter) == expected
+
     def testLearnPattern(self):
         class Foo(object):
             pass
@@ -71,7 +76,7 @@ class CrafterTests(unittest.TestCase):
         folds = 'a=uint:8'
         creases = {}
 
-        with self.assertRaises(InvalidPatternClassException):
+        with pytest.raises(InvalidPatternClassException):
             self.crafter.learn_pattern(cls, unfold_func, folds, creases)
 
     def testLearnSamePatternTwice(self):
@@ -83,7 +88,7 @@ class CrafterTests(unittest.TestCase):
         creases = {}
 
         self.crafter.learn_pattern(cls, unfold_func, folds, creases)
-        with self.assertRaises(InvalidPatternClassException):
+        with pytest.raises(InvalidPatternClassException):
             self.crafter.learn_pattern(cls, unfold_func, folds, creases)
 
     def testLearnPatternInvalidFolds(self):
@@ -94,7 +99,7 @@ class CrafterTests(unittest.TestCase):
         folds = 'a=uint:NotANumber'
         creases = {}
 
-        with self.assertRaises(InvalidFoldFormatException):
+        with pytest.raises(InvalidFoldFormatException):
             self.crafter.learn_pattern(cls, unfold_func, folds, creases)
 
     def testFoldPattern(self):
@@ -115,7 +120,7 @@ class CrafterTests(unittest.TestCase):
         class Foo(object):
             pass
         foo = Foo()
-        with self.assertRaises(FoldingException):
+        with pytest.raises(FoldingException):
             self.crafter.fold(foo)
 
     def testFoldMissingAttribute(self):
@@ -127,7 +132,7 @@ class CrafterTests(unittest.TestCase):
         creases = {}
         self.crafter.learn_pattern(cls, unfold_func, folds, creases)
 
-        with self.assertRaises(FoldingException):
+        with pytest.raises(FoldingException):
             self.crafter.fold(Foo())
 
     def testFoldInvalidDataType(self):
@@ -140,7 +145,7 @@ class CrafterTests(unittest.TestCase):
         self.crafter.learn_pattern(cls, unfold_func, folds, creases)
         foo = Foo()
         foo.a = 'NotANumber'
-        with self.assertRaises(FoldingException):
+        with pytest.raises(FoldingException):
             self.crafter.fold(foo)
 
     def testFoldOutOfRangeValue(self):
@@ -153,7 +158,7 @@ class CrafterTests(unittest.TestCase):
         self.crafter.learn_pattern(cls, unfold_func, folds, creases)
         foo = Foo()
         foo.a = 1 << 20
-        with self.assertRaises(FoldingException):
+        with pytest.raises(FoldingException):
             self.crafter.fold(foo)
 
     def testUnfoldPattern(self):
@@ -177,7 +182,7 @@ class CrafterTests(unittest.TestCase):
     def testUnfoldUnknownPattern(self):
         class Foo(object):
             pass
-        with self.assertRaises(UnfoldingException):
+        with pytest.raises(UnfoldingException):
             self.crafter.unfold(Foo, None)
 
     def testUnfoldMissingData(self):
@@ -196,7 +201,7 @@ class CrafterTests(unittest.TestCase):
 
         value = 127
         data = bitstring.pack('uint:8', value)
-        with self.assertRaises(UnfoldingException):
+        with pytest.raises(UnfoldingException):
             self.crafter.unfold(Foo, data)
 
     def testUnfoldInvalidDataType(self):
@@ -246,6 +251,21 @@ class CrafterTests(unittest.TestCase):
         assert other_foo.a == other_a
         assert other_foo.b == other_b
 
+    def testFoldsUnknownCrafter(self):
+        class Foo(object):
+            pass
+        cls = Foo
+
+        def unfold_func(name, instance, **kw):
+            instance = instance or Foo()
+            instance.a = kw['a']
+            instance.b = kw['b']
+            return instance
+        folds = {"unknown crafter": 'a=uint:8, b=uint:1'}
+        creases = {}
+        with pytest.raises(InvalidFoldFormatException):
+            self.crafter.learn_pattern(cls, unfold_func, folds, creases)
+
 
 class PatternTests(unittest.TestCase):
     def setUp(self):
@@ -287,11 +307,11 @@ class PatternTests(unittest.TestCase):
 
         foo = Foo(10)
         data = fold(foo, crafter=self.id)
-        with self.assertRaises(UnfoldingException):
+        with pytest.raises(UnfoldingException):
             unfold(Foo, data, crafter=self.id)
 
     def testPatternNoFolds(self):
-        with self.assertRaises(InvalidFoldFormatException):
+        with pytest.raises(InvalidFoldFormatException):
             @pattern(self.id)
             class Foo(object):
                 pass
@@ -358,8 +378,29 @@ class PatternTests(unittest.TestCase):
         kwargs = {'a': 127}
         foo = Foo()
 
-        with self.assertRaises(UnfoldingException):
+        with pytest.raises(UnfoldingException):
             foo = Foo.unfold(self.id, foo, **kwargs)
+
+    def testLearnedPattern(self):
+        @pattern(self.id)
+        class Foo(object):
+            _folds = 'a=uint:8'
+            __init__ = init('a')
+            __eq__ = equals('a')
+
+        @pattern(self.id)
+        class Bar(object):
+            _folds = 'a=Foo'
+            __init__ = init('a')
+            __eq__ = equals('a')
+
+        foo = Foo(256)
+        bar = Bar(foo)
+
+        kwargs = {'a': foo}
+        bar = Bar()
+        other_bar = Bar.unfold(self.id, bar, **kwargs)
+        assert bar == other_bar
 
 
 class FoldUnfoldTests(unittest.TestCase):
