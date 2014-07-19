@@ -23,17 +23,18 @@ def unfold(data, type, crafter='global'):
 
 def pattern(cls=None, *, crafter='global', unfold=True):
     '''
-    Class decorator that handles most of the pattern learning machinery for a class.
+    Class decorator that handles most of the pattern-learning machinery
+    for a class.  The decorated class should have the attribute `folds`,
+    and optionally `creases`. `crafter` is a string indicating which crafter
+    the class will be learned by, and defaults to 'global'.
 
-    The decorated class should have the attribute _folds, and optionally _creases.
+    If unfold is True, this creates an "unfold" function on the class that
+    constructs instances of the class from data unfolded by the Crafter.  The
+    attributes that will be set are pulled from the class's `folds` string.
 
-    crafter is a string indicating which crafter the class will be learned by, and defaults to 'global'
-
-    If unfold is True, creates an "unfold" function on the class that constructs instances of the class from data
-    unfolded by the Crafter.  The attributes that will be set are pulled from the class's _folds string.
-
-    If the class's _folds attribute is a dictionary, uses the string found at _folds[creator].
-    Passes _creases to the Crafter if defined, otherwise an empty dictionary.
+    If the class's _folds attribute is a dictionary, uses the string found
+    at `folds`[`creator`].  Passes _creases to the Crafter if defined,
+    otherwise an empty dictionary.
     '''
     if not cls:
         return functools.partial(pattern, crafter=crafter, unfold=unfold)
@@ -55,11 +56,13 @@ def _make_unfold_func(cls):
             try:
                 instance = cls()
             except TypeError:
-                raise UnfoldingException(cls, '__init__ method has 1 or more required arguments')
+                raise UnfoldingException(
+                    cls, '__init__ method has 1 or more required arguments')
         try:
             for attr, fmt in Crafter(name).patterns[cls]['folds']:
                 setattr(instance, attr, kwargs[attr])
         except KeyError:
-            raise UnfoldingException(instance, "missing expected attribute '{}'".format(attr))
+            raise UnfoldingException(
+                instance, "missing expected attribute '{}'".format(attr))
         return instance
     cls.unfold = cls_unfold
