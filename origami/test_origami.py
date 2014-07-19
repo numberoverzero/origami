@@ -257,12 +257,31 @@ class CrafterTests(unittest.TestCase):
         cls = Foo
 
         def unfold_func(name, instance, **kw):
-            instance = instance or Foo()
-            instance.a = kw['a']
-            instance.b = kw['b']
             return instance
+
         folds = {"unknown crafter": 'a=uint:8, b=uint:1'}
         creases = {}
+        with pytest.raises(InvalidFoldFormatException):
+            self.crafter.learn_pattern(cls, unfold_func, folds, creases)
+
+    def testCreaseWithoutCustomFmt(self):
+        counter, my_int_creases = count_creases(fold=int, unfold=str)
+
+        class Foo(object):
+            pass
+        cls = Foo
+
+        def unfold_func(name, instance, **kw):
+            return instance
+
+        creases = {
+            'custom_crease': {
+                'fold': int,
+                'unfold': int
+            }
+        }
+
+        folds = {self.id: 'a=custom_crease'}
         with pytest.raises(InvalidFoldFormatException):
             self.crafter.learn_pattern(cls, unfold_func, folds, creases)
 
