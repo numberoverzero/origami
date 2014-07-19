@@ -1,13 +1,40 @@
-from origami.util import multidelim_generator, validate_bitstring_format
-from origami.exceptions import (
-    InvalidPatternClassException,
-    InvalidFoldFormatException,
-    InvalidCreaseFormatException,
-    FoldingException,
-    UnfoldingException
-)
+from .util import multidelim_generator, validate_bitstring_format
 import bitstring
 import collections
+
+
+class OrigamiException(Exception):
+    pass
+
+
+class InvalidPatternClassException(OrigamiException):
+    def __init__(self, cls, reason):
+        message = "Invalid pattern class '{}': ".format(cls) + reason
+        OrigamiException.__init__(self, message)
+
+
+class InvalidFoldFormatException(OrigamiException):
+    def __init__(self, fold, reason):
+        message = "Invalid fold '{}': ".format(fold) + reason
+        OrigamiException.__init__(self, message)
+
+
+class InvalidCreaseFormatException(OrigamiException):
+    def __init__(self, crease, reason):
+        message = "Invalid crease '{}': ".format(crease) + reason
+        OrigamiException.__init__(self, message)
+
+
+class FoldingException(OrigamiException):
+    def __init__(self, obj, reason):
+        message = "Failed to fold '{}': ".format(obj) + reason
+        OrigamiException.__init__(self, message)
+
+
+class UnfoldingException(OrigamiException):
+    def __init__(self, obj, reason):
+        message = "Failed to unfold '{}': ".format(obj) + reason
+        OrigamiException.__init__(self, message)
 
 _crafters = {}
 
@@ -142,17 +169,17 @@ class Crafter(object):
         except ValueError as e:
             raise FoldingException(obj, str(e))
 
-    def unfold(self, cls_or_obj, data):
+    def unfold(self, data, type):
         '''
         Unfold the object (or return a new instance)
         from a BitString according to its pattern's folds and creases.
         '''
-        cls, instance = self._get_cls_obj(cls_or_obj)
+        cls, instance = self._get_cls_obj(type)
         fmt = self.patterns[cls]['bitstring_format']
         try:
             values = data.readlist(fmt)
         except bitstring.ReadError as e:
-            raise UnfoldingException(cls_or_obj, e.msg)
+            raise UnfoldingException(type, e.msg)
         return self._obj_from_values(cls, instance, values, pos=0)
 
     def _get_flat_values(self, obj):
