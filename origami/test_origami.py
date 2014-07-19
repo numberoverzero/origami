@@ -346,18 +346,18 @@ class PatternTests(unittest.TestCase):
         self.crafter = Crafter(self.id)
 
     def testPattern(self):
-        @pattern(self.id)
+        @pattern(crafter=self.id)
         class Foo(object):
-            _folds = 'a=uint:8'
+            folds = 'a=uint:8'
 
         assert hasattr(Foo, 'unfold')
         assert Foo in self.crafter.patterns
 
     def testPatternWithSlots(self):
-        @pattern(self.id)
+        @pattern(crafter=self.id)
         class Foo(object):
             __slots__ = ['a']
-            _folds = 'a=uint:8'
+            folds = 'a=uint:8'
 
             def __init__(self, a=10):
                 self.a = a
@@ -370,9 +370,9 @@ class PatternTests(unittest.TestCase):
         assert foo == other_foo
 
     def testPatternInvalidInit(self):
-        @pattern(self.id)
+        @pattern(crafter=self.id)
         class Foo(object):
-            _folds = 'a=uint:8'
+            folds = 'a=uint:8'
 
             def __init__(self, a):
                 self.a = a
@@ -384,23 +384,23 @@ class PatternTests(unittest.TestCase):
 
     def testPatternNoFolds(self):
         with pytest.raises(OrigamiException):
-            @pattern(self.id)
+            @pattern(crafter=self.id)
             class Foo(object):
                 pass
 
     def testPatternGlobalCrafter(self):
-        @pattern()
+        @pattern
         class Foo(object):
-            _folds = 'a=uint:8'
+            folds = 'a=uint:8'
             pass
 
         assert hasattr(Foo, 'unfold')
         assert Foo in Crafter('global').patterns
 
     def testGeneratedUnfoldMethod(self):
-        @pattern(self.id)
+        @pattern(crafter=self.id)
         class Foo(object):
-            _folds = 'a=uint:8, b=uint:8'
+            folds = 'a=uint:8, b=uint:8'
             __init__ = init('a', 'b')
             __eq__ = equals('a', 'b')
 
@@ -411,9 +411,9 @@ class PatternTests(unittest.TestCase):
         assert foo == other_foo
 
     def testGeneratedUnfoldReturnsInstance(self):
-        @pattern(self.id)
+        @pattern(crafter=self.id)
         class Foo(object):
-            _folds = 'a=uint:8, b=uint:8'
+            folds = 'a=uint:8, b=uint:8'
             __init__ = init('a', 'b')
             __eq__ = equals('a', 'b')
 
@@ -424,10 +424,10 @@ class PatternTests(unittest.TestCase):
         assert foo is other_foo
 
     def testMultiCrafterUnfoldWorksForBoth(self):
-        @pattern(self.id)
-        @pattern(self.other_id)
+        @pattern(crafter=self.id)
+        @pattern(crafter=self.other_id)
         class Foo(object):
-            _folds = 'a=uint:8, b=uint:8'
+            folds = 'a=uint:8, b=uint:8'
             __init__ = init('a', 'b')
             __eq__ = equals('a', 'b')
 
@@ -441,9 +441,9 @@ class PatternTests(unittest.TestCase):
         assert foo == other_foo
 
     def testPatternUnfoldMissingAttr(self):
-        @pattern(self.id)
+        @pattern(crafter=self.id)
         class Foo(object):
-            _folds = 'a=uint:8, b=uint:8'
+            folds = 'a=uint:8, b=uint:8'
             __init__ = init('a', 'b')
             __eq__ = equals('a', 'b')
 
@@ -454,15 +454,15 @@ class PatternTests(unittest.TestCase):
             foo = Foo.unfold(self.id, foo, **kwargs)
 
     def testLearnedPattern(self):
-        @pattern(self.id)
+        @pattern(crafter=self.id)
         class Foo(object):
-            _folds = 'a=uint:8'
+            folds = 'a=uint:8'
             __init__ = init('a')
             __eq__ = equals('a')
 
-        @pattern(self.id)
+        @pattern(crafter=self.id)
         class Bar(object):
-            _folds = 'a=Foo'
+            folds = 'a=Foo'
             __init__ = init('a')
             __eq__ = equals('a')
 
@@ -482,9 +482,9 @@ class FoldUnfoldTests(unittest.TestCase):
         self.crafter = Crafter(self.id)
 
     def testSingleCrafter(self):
-        @pattern(self.id)
+        @pattern(crafter=self.id)
         class Foo(object):
-            _folds = 'a=uint:8, b=uint:1'
+            folds = 'a=uint:8, b=uint:1'
             __init__ = init('a', 'b')
             __eq__ = equals('a', 'b')
 
@@ -496,9 +496,9 @@ class FoldUnfoldTests(unittest.TestCase):
         assert foo == other_foo
 
     def testUnfoldByString(self):
-        @pattern(self.id)
+        @pattern(crafter=self.id)
         class Foo(object):
-            _folds = 'a=uint:8, b=uint:1'
+            folds = 'a=uint:8, b=uint:1'
             __init__ = init('a', 'b')
             __eq__ = equals('a', 'b')
 
@@ -510,9 +510,9 @@ class FoldUnfoldTests(unittest.TestCase):
         assert foo == other_foo
 
     def testUnfoldIntoInstance(self):
-        @pattern(self.id)
+        @pattern(crafter=self.id)
         class Foo(object):
-            _folds = 'a=uint:8, b=uint:1'
+            folds = 'a=uint:8, b=uint:1'
             __init__ = init('a', 'b')
             __eq__ = equals('a', 'b')
 
@@ -528,10 +528,10 @@ class FoldUnfoldTests(unittest.TestCase):
     def testNameCrease(self):
         counter, a_creases = count_creases(fold=int, unfold=str)
 
-        @pattern(self.id)
+        @pattern(crafter=self.id)
         class Foo(object):
-            _folds = 'a=uint:8, b=uint:1'
-            _creases = {'a': a_creases}
+            folds = 'a=uint:8, b=uint:1'
+            creases = {'a': a_creases}
             __init__ = init('a', 'b')
             __eq__ = equals('a', 'b')
 
@@ -544,15 +544,15 @@ class FoldUnfoldTests(unittest.TestCase):
         assert counter['fold'] == counter['unfold'] == 1
 
     def testFoldLearnedPattern(self):
-        @pattern(self.id)
+        @pattern(crafter=self.id)
         class Foo(object):
-            _folds = 'a=uint:8'
+            folds = 'a=uint:8'
             __init__ = init('a')
             __eq__ = equals('a')
 
-        @pattern(self.id)
+        @pattern(crafter=self.id)
         class Bar(object):
-            _folds = 'a=Foo'
+            folds = 'a=Foo'
             __init__ = init('a')
             __eq__ = equals('a')
 
@@ -567,10 +567,10 @@ class FoldUnfoldTests(unittest.TestCase):
     def testFormatCrease(self):
         counter, uint8_creases = count_creases(fold=int, unfold=str)
 
-        @pattern(self.id)
+        @pattern(crafter=self.id)
         class Foo(object):
-            _folds = 'a=uint:8, b=uint:1'
-            _creases = {'uint:8': uint8_creases}
+            folds = 'a=uint:8, b=uint:1'
+            creases = {'uint:8': uint8_creases}
             __init__ = init('a', 'b')
             __eq__ = equals('a', 'b')
 
@@ -586,10 +586,10 @@ class FoldUnfoldTests(unittest.TestCase):
         counter, my_int_creases = count_creases(fold=int, unfold=str)
         my_int_creases['fmt'] = 'uint:8'
 
-        @pattern(self.id)
+        @pattern(crafter=self.id)
         class Foo(object):
-            _folds = 'a=my_int, b=uint:1'
-            _creases = {'my_int': my_int_creases}
+            folds = 'a=my_int, b=uint:1'
+            creases = {'my_int': my_int_creases}
             __init__ = init('a', 'b')
             __eq__ = equals('a', 'b')
 
@@ -605,10 +605,10 @@ class FoldUnfoldTests(unittest.TestCase):
         name_counter, name_creases = count_creases(fold=int, unfold=str)
         fmt_counter, fmt_creases = count_creases(fold=int, unfold=str)
 
-        @pattern(self.id)
+        @pattern(crafter=self.id)
         class Foo(object):
-            _folds = 'a=uint:8, b=uint:1'
-            _creases = {'a': name_creases, 'uint:8': fmt_creases}
+            folds = 'a=uint:8, b=uint:1'
+            creases = {'a': name_creases, 'uint:8': fmt_creases}
             __init__ = init('a', 'b')
             __eq__ = equals('a', 'b')
 
@@ -622,10 +622,10 @@ class FoldUnfoldTests(unittest.TestCase):
         assert fmt_counter['fold'] == fmt_counter['unfold'] == 0
 
     def testMultipleCraftersSameFolds(self):
-        @pattern(self.id)
-        @pattern(self.other_id)
+        @pattern(crafter=self.id)
+        @pattern(crafter=self.other_id)
         class Foo(object):
-            _folds = 'a=uint:8, b=uint:1'
+            folds = 'a=uint:8, b=uint:1'
             __init__ = init('a', 'b')
             __eq__ = equals('a', 'b')
 
@@ -641,10 +641,10 @@ class FoldUnfoldTests(unittest.TestCase):
         assert foo == other_foo
 
     def testMultipleCraftersDifferentFolds(self):
-        @pattern(self.id)
-        @pattern(self.other_id)
+        @pattern(crafter=self.id)
+        @pattern(crafter=self.other_id)
         class Foo(object):
-            _folds = {
+            folds = {
                 self.id: 'a=uint:8, b=uint:1',
                 self.other_id: 'b=uint:1, c=uint:7'
             }
@@ -668,14 +668,14 @@ class FoldUnfoldTests(unittest.TestCase):
     def testMultipleCraftersUseSameCreases(self):
         counter, b_creases = count_creases(fold=int, unfold=str)
 
-        @pattern(self.other_id)
-        @pattern(self.id)
+        @pattern(crafter=self.other_id)
+        @pattern(crafter=self.id)
         class Foo(object):
-            _folds = {
+            folds = {
                 self.id: 'a=uint:8, b=uint:4',
                 self.other_id: 'b=uint:4, c=uint:7'
             }
-            _creases = {'b': b_creases}
+            creases = {'b': b_creases}
             __init__ = init(*list('abc'))
             __eq__ = equals(*list('abc'))
 

@@ -18,7 +18,7 @@ long_description = read('README.rst')
 
 setup(
     name='Origami',
-    version='0.2.0',
+    version='0.3.0',
     author='Joe Cross',
     author_email='joe.mcross@gmail.com',
     packages=['origami'],

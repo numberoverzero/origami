@@ -1,3 +1,4 @@
+import functools
 from origami.crafter import Crafter, OrigamiException, UnfoldingException
 
 __all__ = ['Crafter', 'pattern', 'fold', 'unfold', 'OrigamiException']
@@ -20,7 +21,7 @@ def unfold(data, type, crafter='global'):
     return Crafter(crafter).unfold(data, type)
 
 
-def pattern(crafter='global', unfold=True):
+def pattern(cls=None, *, crafter='global', unfold=True):
     '''
     Class decorator that handles most of the pattern learning machinery for a class.
 
@@ -34,29 +35,31 @@ def pattern(crafter='global', unfold=True):
     If the class's _folds attribute is a dictionary, uses the string found at _folds[creator].
     Passes _creases to the Crafter if defined, otherwise an empty dictionary.
     '''
-    def wrap_class(cls):
-        c = Crafter(crafter)
+    if not cls:
+        return functools.partial(pattern, crafter=crafter, unfold=unfold)
 
-        if unfold:
-            @classmethod
-            def cls_unfold(cls, name, instance, **kwargs):
-                if instance is None:
-                    try:
-                        instance = cls()
-                    except TypeError:
-                        raise UnfoldingException(cls, '__init__ method has 1 or more requires arguments')
-                for attr, fmt in Crafter(name).patterns[cls]['folds']:
-                    try:
-                        setattr(instance, attr, kwargs[attr])
-                    except KeyError:
-                        raise UnfoldingException(instance, "missing expected attribute '{}'".format(attr))
-                return instance
-            cls.unfold = cls_unfold
+    c = Crafter(crafter)
+    if unfold:
+        _make_unfold_func(cls)
+    unfold_func = cls.unfold
+    folds = getattr(cls, 'folds', '')
+    creases = getattr(cls, 'creases', {})
+    c.learn_pattern(cls, unfold_func, folds, creases)
+    return cls
 
-        unfold_func = cls.unfold
-        folds = getattr(cls, '_folds', '')
-        creases = getattr(cls, '_creases', {})
-        c.learn_pattern(cls, unfold_func, folds, creases)
 
-        return cls
-    return wrap_class
+def _make_unfold_func(cls):
+    @classmethod
+    def cls_unfold(cls, name, instance, **kwargs):
+        if instance is None:
+            try:
+                instance = cls()
+            except TypeError:
+                raise UnfoldingException(cls, '__init__ method has 1 or more required arguments')
+        try:
+            for attr, fmt in Crafter(name).patterns[cls]['folds']:
+                setattr(instance, attr, kwargs[attr])
+        except KeyError:
+            raise UnfoldingException(instance, "missing expected attribute '{}'".format(attr))
+        return instance
+    cls.unfold = cls_unfold
