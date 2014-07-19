@@ -24,3 +24,7 @@ def build():
 @invoke.task(build)
 def test():
     run('tox')
+
+@invoke.task(clean)
+def pypi():
+    run('python setup.py sdist upload -r pypi')

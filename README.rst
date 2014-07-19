@@ -78,7 +78,7 @@ And to use them::
     print(
         copy_action.point.x,
         copy_action.point.y,
-        copy_action.undo
+        copy_action.id
     )
 
     server.send_action(action_data)
