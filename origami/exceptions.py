@@ -14,6 +14,12 @@ class InvalidFoldFormatException(OrigamiException):
         OrigamiException.__init__(self, message)
 
 
+class InvalidCreaseFormatException(OrigamiException):
+    def __init__(self, crease, reason):
+        message = "Invalid crease '{}': ".format(crease) + reason
+        OrigamiException.__init__(self, message)
+
+
 class FoldingException(OrigamiException):
     def __init__(self, obj, reason):
         message = "Failed to fold '{}': ".format(obj) + reason

@@ -2,6 +2,7 @@ from origami.util import multidelim_generator, validate_bitstring_format
 from origami.exceptions import (
     InvalidPatternClassException,
     InvalidFoldFormatException,
+    InvalidCreaseFormatException,
     FoldingException,
     UnfoldingException
 )
@@ -75,6 +76,11 @@ class Crafter(object):
                 folds = folds[self.name]
             except KeyError:
                 raise InvalidFoldFormatException(folds, "No folds found for Crafter with name '{}'".format(self.name))
+        for name, crease in creases.items():
+            if 'fold' not in crease:
+                raise InvalidCreaseFormatException(name, "Custom creases must specify a fold method")
+            if 'unfold' not in crease:
+                raise InvalidCreaseFormatException(name, "Custom creases must specify an unfold method")
 
         for name, fmt in multidelim_generator(folds, ',', '='):
             if name in creases:
@@ -98,9 +104,9 @@ class Crafter(object):
                 try:
                     real_fmt = format_creases[fmt]['fmt']
                 except KeyError:
-                    raise InvalidFoldFormatException(fmt, "Custom creases require a valid bistring format under the key 'fmt'.")
+                    raise InvalidCreaseFormatException(fmt, "Custom creases require a valid bistring format under the key 'fmt'.")
                 if not validate_bitstring_format(real_fmt):
-                    raise InvalidFoldFormatException(real_fmt, 'Custom creases fmt not a known pattern or valid bitstring format.')
+                    raise InvalidCreaseFormatException(fmt, 'Custom creases fmt not a known pattern or valid bitstring format.')
                 bitstring_chunks.append(real_fmt)
                 processed_folds.append((name, fmt))
             else:

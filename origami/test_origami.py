@@ -2,6 +2,7 @@ from origami import Crafter, pattern, fold, unfold
 from origami.exceptions import (
     InvalidPatternClassException,
     InvalidFoldFormatException,
+    InvalidCreaseFormatException,
     FoldingException,
     UnfoldingException
 )
@@ -282,7 +283,60 @@ class CrafterTests(unittest.TestCase):
         }
 
         folds = {self.id: 'a=custom_crease'}
-        with pytest.raises(InvalidFoldFormatException):
+        with pytest.raises(InvalidCreaseFormatException):
+            self.crafter.learn_pattern(cls, unfold_func, folds, creases)
+
+    def testCreaseMissingFold(self):
+        class Foo(object):
+            pass
+        cls = Foo
+
+        def unfold_func(name, instance, **kw):
+            return instance
+
+        folds = {self.id: 'a=uint:8'}
+        creases = {
+            "uint:8": {
+                "unfold": int
+            }
+        }
+        with pytest.raises(InvalidCreaseFormatException):
+            self.crafter.learn_pattern(cls, unfold_func, folds, creases)
+
+    def testCreaseMissingUnfold(self):
+        class Foo(object):
+            pass
+        cls = Foo
+
+        def unfold_func(name, instance, **kw):
+            return instance
+
+        folds = {self.id: 'a=uint:8'}
+        creases = {
+            "uint:8": {
+                "fold": int
+            }
+        }
+        with pytest.raises(InvalidCreaseFormatException):
+            self.crafter.learn_pattern(cls, unfold_func, folds, creases)
+
+    def testInvalidNameFmt(self):
+        class Foo(object):
+            pass
+        cls = Foo
+
+        def unfold_func(name, instance, **kw):
+            return instance
+
+        folds = {self.id: 'a=my_crease'}
+        creases = {
+            "my_crease": {
+                "fmt": "invalid",
+                "fold": int,
+                "unfold": int
+            }
+        }
+        with pytest.raises(InvalidCreaseFormatException):
             self.crafter.learn_pattern(cls, unfold_func, folds, creases)
 
 
