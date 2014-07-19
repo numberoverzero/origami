@@ -496,6 +496,36 @@ class FoldUnfoldTests(unittest.TestCase):
 
         assert foo == other_foo
 
+    def testUnfoldByString(self):
+        @pattern(self.id)
+        class Foo(object):
+            _folds = 'a=uint:8, b=uint:1'
+            __init__ = init('a', 'b')
+            __eq__ = equals('a', 'b')
+
+        foo = Foo(129, 1)
+
+        data = fold(foo, crafter=self.id)
+        other_foo = unfold("Foo", data, crafter=self.id)
+
+        assert foo == other_foo
+
+    def testUnfoldIntoInstance(self):
+        @pattern(self.id)
+        class Foo(object):
+            _folds = 'a=uint:8, b=uint:1'
+            __init__ = init('a', 'b')
+            __eq__ = equals('a', 'b')
+
+        foo = Foo(129, 1)
+        other_foo = Foo()
+
+        data = fold(foo, crafter=self.id)
+        third_foo = unfold(other_foo, data, crafter=self.id)
+
+        assert foo == third_foo
+        assert other_foo is third_foo
+
     def testNameCrease(self):
         counter, a_creases = count_creases(fold=int, unfold=str)
 
@@ -513,6 +543,27 @@ class FoldUnfoldTests(unittest.TestCase):
 
         assert foo == other_foo
         assert counter['fold'] == counter['unfold'] == 1
+
+    def testFoldLearnedPattern(self):
+        @pattern(self.id)
+        class Foo(object):
+            _folds = 'a=uint:8'
+            __init__ = init('a')
+            __eq__ = equals('a')
+
+        @pattern(self.id)
+        class Bar(object):
+            _folds = 'a=Foo'
+            __init__ = init('a')
+            __eq__ = equals('a')
+
+        foo = Foo(129)
+        bar = Bar(foo)
+
+        data = fold(bar, crafter=self.id)
+        other_bar = unfold(Bar, data, crafter=self.id)
+
+        assert bar == other_bar
 
     def testFormatCrease(self):
         counter, uint8_creases = count_creases(fold=int, unfold=str)

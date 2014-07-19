@@ -140,13 +140,13 @@ class Crafter(object):
         except bitstring.CreationError as e:
             raise FoldingException(obj, str(e))
         except ValueError as e:
-            if hasattr(e, 'message'):
-                raise FoldingException(obj, e.message)
-            else:
-                raise FoldingException(obj, str(e))
+            raise FoldingException(obj, str(e))
 
     def unfold(self, cls_or_obj, data):
-        '''Unfold the object (or return a new instance) from a BitString according to its pattern's folds and creases.'''
+        '''
+        Unfold the object (or return a new instance)
+        from a BitString according to its pattern's folds and creases.
+        '''
         cls, instance = self._get_cls_obj(cls_or_obj)
         fmt = self.patterns[cls]['bitstring_format']
         try:
@@ -166,7 +166,8 @@ class Crafter(object):
             try:
                 data = getattr(obj, attr)
             except AttributeError:
-                raise FoldingException(obj, "missing expected attribute '{}'".format(attr))
+                raise FoldingException(
+                    obj, "missing expected attribute '{}'".format(attr))
 
             if fmt in self.patterns:
                 values.extend(self._get_flat_values(data))
@@ -202,18 +203,18 @@ class Crafter(object):
         return self.patterns[cls]['unfold'](self.name, instance, **kwargs)
 
     def _get_cls_obj(self, cls_or_obj):
-        instance = None
-
+        # Instance
+        if cls_or_obj.__class__ in self.patterns:
+            instance = cls_or_obj
+            cls = instance.__class__
         # Class or string
-        if cls_or_obj in self.patterns:
+        elif cls_or_obj in self.patterns:
             if isinstance(cls_or_obj, str):
                 cls = self.patterns[cls_or_obj]
             else:
                 cls = cls_or_obj
-        #Instance
-        elif cls_or_obj.__class__ in self.patterns:
-            cls = cls_or_obj.__class__
-            instance = cls_or_obj
+            instance = None
+        # Unknown
         else:
             raise UnfoldingException(cls_or_obj, "Unknown object or pattern class '{}'.".format(cls_or_obj))
         return cls, instance
