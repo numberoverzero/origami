@@ -18,12 +18,12 @@ long_description = read('README.rst')
 
 setup(
     name='Origami',
-    version='0.3.1',
+    version='0.3.2',
     author='Joe Cross',
     author_email='joe.mcross@gmail.com',
     packages=['origami'],
     url='https://github.com/numberoverzero/origami',
-    license='LICENSE.txt',
+    license='MIT',
     description='Lightweight bit packing for classes',
     long_description=long_description,
     install_requires=["bitstring"]
